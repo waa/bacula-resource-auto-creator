@@ -58,7 +58,7 @@ from datetime import datetime
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.05'
+version = '0.06'
 reldate = 'February 10, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
@@ -89,10 +89,7 @@ offline = False
 # ----------------------
 def now():
     'Return the current date/time in human readable format.'
-    # if type == 'file':
     return datetime.today().strftime('%Y%m%d%H%M%S')
-    # elif type == 'log':
-    #   return datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 
 def usage():
     'Show the instructions and script information.'
@@ -283,6 +280,10 @@ log_file = work_dir + '/' + lower_name_and_time + '.log'
 # -----------------------------
 os.mkdir(work_dir)
 
+# Create the string added to Resource config files 'Description =' line
+# ---------------------------------------------------------------------
+created_by_str = 'Created by ' + progname + ' v' + version + ' - ' + date_stamp
+
 # Log the startup header
 # ----------------------
 log('\n\n' + '='*10 + '[ Starting ' + sys.argv[0] + ' v' + version + ' ]' + '='*10)
@@ -312,7 +313,7 @@ num_libs = len(libs_sg_lst)
 log(' - Found ' + str(num_libs) + ' librar' + ('ies' if num_libs == 0 or num_libs > 1 else 'y'))
 log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_sg_lst)))
 
-# waa - 20220422 - Need to see the /dev/tape/by-id directory and compare to lsscsi output
+# waa - 20240203 - Need to see the /dev/tape/by-id directory and compare to lsscsi output
 # ---------------------------------------------------------------------------------------
 if debug:
     log('Command \'lsscsi -g\' output:')
@@ -426,7 +427,7 @@ for lib in libs_byid_nodes_lst:
     # tapes and two types of drives. An error is thrown if an LTOx tape is loaded into LTOy drive
     # -------------------------------------------------------------------------------------------
     if lib == 'scsi-SSTK_L700_XYZZY_A':
-        log('- Skipping multi LTO drive mhVTL library: ' + lib)
+        log('- Skipping multi LTO drive mhVTL library: ' + lib + '\n')
         continue
     else:
         drive_index = 0
@@ -504,7 +505,7 @@ for lib in lib_dict:
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     log('- Generating Director Storage Resource')
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
-    created_by_str = 'Created by ' + progname + ' v' + version + ' - ' + date_stamp
+
     # Director Storage
     # ----------------
     res_file = work_dir + '/DirectorStorage_' + autochanger_name + '.cfg'
@@ -564,11 +565,11 @@ for lib in lib_dict:
 
 # Print location of log file and resource config files
 # ----------------------------------------------------
-log('\n' + '='*105)
-log('DONE: Configuration files and script log file in: ' + work_dir)
+log('\n' + '='*107)
+log('DONE: Resource configuration files and script log file in: ' + work_dir)
 log('NOTE: You *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ' in the directory above:')
 for lib in lib_dict:
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
     log('      * DirectorStorage_' + autochanger_name + '.cfg')
-log('='*105)
+log('='*107)
 log(prog_info_txt)
