@@ -58,8 +58,8 @@ from datetime import datetime
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.06'
-reldate = 'February 10, 2024'
+version = '0.07'
+reldate = 'February 11, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -394,7 +394,7 @@ log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in libs_byid_nodes_lst:
     result = lib_or_drv_status('mtx -f /dev/tape/by-id/' + lib + ' status')
     num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
-    hdr = '\nUnloading (' + str(num_drives) + ') Tape Drives In Library \'' + lib + '\'\n'
+    hdr = '\n' + lib + ': Unloading (' + str(num_drives) + ') Tape Drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     # Unload all the drives in the library
     # ------------------------------------
@@ -479,7 +479,7 @@ for lib in libs_byid_nodes_lst:
                         log(' - EMPTY: Drive by-id node \'' + drive_byid_node + '\' is empty')
             drive_index += 1
         log('')
-log('\n\n' + '='*8 + '[ Bacula Drive \'ArchiveDevice\' => Bacula \'DriveIndex\' settings ]' + '='*8) 
+log('\n' + '='*8 + '[ Bacula Drive \'ArchiveDevice\' => Bacula \'DriveIndex\' settings ]' + '='*8) 
 for lib in libs_byid_nodes_lst:
     hdr = '\nLibrary: ' + lib + '\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
