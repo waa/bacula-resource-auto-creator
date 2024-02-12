@@ -50,21 +50,21 @@
 import os
 import re
 import sys
-import random
 import subprocess
 from time import sleep
+from random import randint
 from datetime import datetime
 
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.07'
-reldate = 'February 11, 2024'
+version = '0.08'
+reldate = 'February 12, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
 prog_info_txt = progname + ' - v' + version + ' - ' + scriptname \
-                + '\nBy: ' + progauthor + ' ' + authoremail + ' (c) ' + reldate + '\n'
+              + '\nBy: ' + progauthor + ' ' + authoremail + ' (c) ' + reldate + '\n'
 
 # Should all debugging information be logged?
 # (ie: mtx, mt outputs, and reporting of all actions)
@@ -81,6 +81,10 @@ sleep_secs = 10
 # ------------------------------------------
 offline = False
 
+# list of tape libraries to skip during testing
+# ---------------------------------------------
+libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'otherLibToSkip']
+
 # ==================================================
 # Nothing below this line should need to be modified
 # ==================================================
@@ -93,7 +97,7 @@ def now():
 
 def usage():
     'Show the instructions and script information.'
-    print(doc_opt_str)
+    # print(doc_opt_str)
     print(prog_info_txt)
     sys.exit(1)
 
@@ -201,7 +205,7 @@ def get_random_slot(lib):
     'Return a pseudo-random slot that contains a tape and the volume name in the slot.'
     result = lib_or_drv_status('mtx -f /dev/tape/by-id/' + lib + ' status | grep "Storage Element [0-9]\{1,3\}:Full" | grep -v "CLN"')
     full_slots_lst = re.findall('Storage Element [0-9].?:Full.* ', result.stdout)
-    rand_int = random.randint(0, len(full_slots_lst) - 1)
+    rand_int = randint(0, len(full_slots_lst) - 1)
     slot = re.sub('Storage Element ([0-9].?):Full.*', '\\1', full_slots_lst[rand_int])
     vol = re.sub('.*:VolumeTag=(.*).*', '\\1', full_slots_lst[rand_int]).rstrip()
     return slot, vol
@@ -228,6 +232,26 @@ def write_res_file(filename, text):
 # ================
 # BEGIN THE SCRIPT
 # ================
+
+# Set the log directory and file name. This directory will also
+# be where we write the cut-n-paste Bacula resource configurations
+# ----------------------------------------------------------------
+date_stamp = now()
+lower_name_and_time = progname.replace(' ', '-').lower() + '_' + date_stamp
+work_dir = '/tmp/' + lower_name_and_time
+log_file = work_dir + '/' + lower_name_and_time + '.log'
+
+# Create the lib_dict dictionary. It will hold {'libraryName': ('drive_byid_node', drive_index)...}
+# -------------------------------------------------------------------------------------------------
+lib_dict = {}
+
+# Create the work_dir directory
+# -----------------------------
+os.mkdir(work_dir)
+
+# Create the string added to Resource config files 'Description =' line
+# ---------------------------------------------------------------------
+created_by_str = 'Created by ' + progname + ' v' + version + ' - ' + date_stamp
 
 # Set up the text string templates for the three types of
 # resource configuration files that need to be created
@@ -268,26 +292,12 @@ storage_device_tpl = """Device {
   ArchiveDevice =
 }"""
 
-# Set the log directory and file name. This directory will also
-# be where we write the cut-n-paste Bacula resource configurations
-# ----------------------------------------------------------------
-date_stamp = now()
-lower_name_and_time = progname.replace(' ', '-').lower() + '_' + date_stamp
-work_dir = '/tmp/' + lower_name_and_time
-log_file = work_dir + '/' + lower_name_and_time + '.log'
-
-# Create the work_dir directory
-# -----------------------------
-os.mkdir(work_dir)
-
-# Create the string added to Resource config files 'Description =' line
-# ---------------------------------------------------------------------
-created_by_str = 'Created by ' + progname + ' v' + version + ' - ' + date_stamp
-
 # Log the startup header
 # ----------------------
-log('\n\n' + '='*10 + '[ Starting ' + sys.argv[0] + ' v' + version + ' ]' + '='*10)
-log('- Logging to file: ' + log_file)
+hdr = '[ Starting ' + sys.argv[0] + ' v' + version + ' ]'
+log('\n\n' + '='*10 + hdr + '='*10)
+log('- Work directory: ' + work_dir)
+log('- Logging to file: ' + lower_name_and_time + '.log')
 
 # Get the OS's uname to be used in other tests
 # --------------------------------------------
@@ -364,7 +374,8 @@ if num_drives != 0:
     for drive_st in drives_st_lst:
         drives_byid_nodes_lst.append(re.sub('.* (scsi-.+?) ->.*/n' + drive_st + '\n.*', '\\1', dev_tape_by_id_txt, flags = re.DOTALL))
     log(' - Tape drive by-id node' + ('s' if num_drives > 1 else '') + ': ' + str(', '.join(drives_byid_nodes_lst)))
-log('='*10 + '[ Startup Complete ]' + '='*10)
+hdr = '[ Startup Complete ]'
+log('='*10 + hdr + '='*10)
 
 # If 'offline' is True send the offline command to all drives first
 # -----------------------------------------------------------------
@@ -412,7 +423,6 @@ for lib in libs_byid_nodes_lst:
 # in it, then load a tape into each one, and attempt to identify
 # the by-id node having a tape in it, and correlate its drive index
 # -----------------------------------------------------------------
-lib_dict = {}
 hdr = '\nIterating Through Each Library Found\n'
 log('\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in libs_byid_nodes_lst:
@@ -420,14 +430,14 @@ for lib in libs_byid_nodes_lst:
     num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
     hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
-    # Now loop through each drive, load a tape in it
+    # Now iterate through each drive, load a tape in it
     # and then check to see which drive by-id is loaded
     # -------------------------------------------------
     # If this is mhVTL, skip the scsi-SSTK_L700_XYZZY_A library because it has two types of
     # tapes and two types of drives. An error is thrown if an LTOx tape is loaded into LTOy drive
     # -------------------------------------------------------------------------------------------
-    if lib == 'scsi-SSTK_L700_XYZZY_A':
-        log('- Skipping multi LTO drive mhVTL library: ' + lib + '\n')
+    if lib in libs_to_skip:
+        log('- Skipping library: ' + lib + '\n')
         continue
     else:
         drive_index = 0
@@ -479,7 +489,8 @@ for lib in libs_byid_nodes_lst:
                         log(' - EMPTY: Drive by-id node \'' + drive_byid_node + '\' is empty')
             drive_index += 1
         log('')
-log('\n' + '='*8 + '[ Bacula Drive \'ArchiveDevice\' => Bacula \'DriveIndex\' settings ]' + '='*8) 
+hdr = '[ Bacula Drive \'ArchiveDevice\' => Bacula \'DriveIndex\' settings ]'
+log('\n' + '='*8 + hdr + '='*8) 
 for lib in libs_byid_nodes_lst:
     hdr = '\nLibrary: ' + lib + '\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
@@ -567,7 +578,7 @@ for lib in lib_dict:
 # ----------------------------------------------------
 log('\n' + '='*107)
 log('DONE: Resource configuration files and script log file in: ' + work_dir)
-log('NOTE: You *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ' in the directory above:')
+log('NOTE: Before use, you *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ' in the directory above:')
 for lib in lib_dict:
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
     log('      * DirectorStorage_' + autochanger_name + '.cfg')
