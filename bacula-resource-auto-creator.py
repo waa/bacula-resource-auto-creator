@@ -58,8 +58,8 @@ from datetime import datetime
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.08'
-reldate = 'February 12, 2024'
+version = '0.09'
+reldate = 'February 13, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -83,6 +83,9 @@ offline = False
 
 # list of tape libraries to skip during testing
 # ---------------------------------------------
+# If testing with mhVTL, skip the scsi-SSTK_L700_XYZZY_A library because it has LTO8/9
+# tapes and LTO8/9 drives. An error is thrown if an LTOx tape is loaded into LTOy drive
+# -------------------------------------------------------------------------------------
 libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'otherLibToSkip']
 
 # ==================================================
@@ -433,9 +436,6 @@ for lib in libs_byid_nodes_lst:
     # Now iterate through each drive, load a tape in it
     # and then check to see which drive by-id is loaded
     # -------------------------------------------------
-    # If this is mhVTL, skip the scsi-SSTK_L700_XYZZY_A library because it has two types of
-    # tapes and two types of drives. An error is thrown if an LTOx tape is loaded into LTOy drive
-    # -------------------------------------------------------------------------------------------
     if lib in libs_to_skip:
         log('- Skipping library: ' + lib + '\n')
         continue
@@ -577,7 +577,7 @@ for lib in lib_dict:
 # Print location of log file and resource config files
 # ----------------------------------------------------
 log('\n' + '='*107)
-log('DONE: Resource configuration files and script log file in: ' + work_dir)
+log('DONE: Script output log file and Bacula resource configuration files in: ' + work_dir)
 log('NOTE: Before use, you *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ' in the directory above:')
 for lib in lib_dict:
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
