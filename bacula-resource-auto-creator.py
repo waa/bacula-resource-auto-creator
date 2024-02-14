@@ -58,7 +58,7 @@ from datetime import datetime
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.09'
+version = '0.10'
 reldate = 'February 13, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
@@ -135,7 +135,7 @@ def get_shell_result(cmd):
 
 def get_uname():
     'Get the OS uname to be use in other tests.'
-    log('- Getting OS\'s uname for use in other tests')
+    log('- Getting the OS uname for use in other tests')
     cmd = 'uname'
     if debug:
         log('shell command: ' + cmd)
@@ -189,7 +189,7 @@ def lib_or_drv_status(cmd):
 
 def loaded(lib, index):
     'If the drive (index) is loaded, return the slot and volume that is in it, otherwise return 0, 0'
-    result = lib_or_drv_status('mtx -f /dev/tape/by-id/' + lib + ' status')
+    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
     drive_loaded_line = re.search('Data Transfer Element ' + str(index) + ':Full.*', result.stdout)
     if drive_loaded_line is not None:
         slot_and_vol_loaded = (re.sub('^Data Transfer Element.*Element (\d+) Loaded.*= (\w+)', '\\1 \\2', drive_loaded_line.group(0))).split()
@@ -206,7 +206,7 @@ def loaded(lib, index):
 
 def get_random_slot(lib):
     'Return a pseudo-random slot that contains a tape and the volume name in the slot.'
-    result = lib_or_drv_status('mtx -f /dev/tape/by-id/' + lib + ' status | grep "Storage Element [0-9]\{1,3\}:Full" | grep -v "CLN"')
+    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status | grep "Storage Element [0-9]\{1,3\}:Full" | grep -v "CLN"')
     full_slots_lst = re.findall('Storage Element [0-9].?:Full.* ', result.stdout)
     rand_int = randint(0, len(full_slots_lst) - 1)
     slot = re.sub('Storage Element ([0-9].?):Full.*', '\\1', full_slots_lst[rand_int])
@@ -214,7 +214,7 @@ def get_random_slot(lib):
     return slot, vol
 
 def unload(lib, slot, drive):
-    cmd = 'mtx -f /dev/tape/by-id/' + lib + ' unload ' + slot + ' ' + str(drive)
+    cmd = 'mtx -f ' + byid_node_dir_str + '/' + lib + ' unload ' + slot + ' ' + str(drive)
     if debug:
         log('mtx command: ' + cmd)
     result = get_shell_result(cmd)
@@ -311,8 +311,27 @@ uname = get_uname()
 # -------------------------------------------
 ready = get_ready_str()
 
-# First, we get the list of tape libraries' sg nodes
-# --------------------------------------------------
+# Check for lin_tape driver
+# -------------------------
+log('- Checking for lin_tape driver')
+cmd = 'lsmod | grep "^lin_tape" | wc -l'
+if debug:
+    log('lsmod command: ' + cmd)
+result = get_shell_result(cmd)
+if debug:
+    log_cmd_results(result)
+chk_cmd_result(result, cmd)
+if result.stdout.rstrip('\n') == '1':
+    log(' - Found the lin_tape kernel driver loaded')
+    # lin_tape = True
+    byid_node_dir_str = '/dev/lin_tape/by-id'
+else:
+    log(' - Did not find the lin_tape kernel driver loaded')
+    # lin_tape = False
+    byid_node_dir_str = '/dev/tape/by-id'
+
+# Get the list of tape libraries' sg nodes
+# ----------------------------------------
 log('- Getting the list of tape libraries\' sg nodes')
 cmd = 'lsscsi -g | grep mediumx | grep -o "sg[0-9]*" | sort'
 if debug:
@@ -328,17 +347,17 @@ log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join
 
 # waa - 20240203 - Need to see the /dev/tape/by-id directory and compare to lsscsi output
 # ---------------------------------------------------------------------------------------
-if debug:
-    log('Command \'lsscsi -g\' output:')
 cmd = 'lsscsi -g'
+if debug:
+    log('Command \'' + cmd + '\' output:')
 result = get_shell_result(cmd)
 if debug:
     log_cmd_results(result)
 chk_cmd_result(result, cmd)
 
+cmd = 'ls -la ' + byid_node_dir_str
 if debug:
-    log('Command \'ls -la /dev/tape/by-id\' output:')
-cmd = 'ls -la /dev/tape/by-id'
+    log('Command \'' + cmd + '\' output:')
 result = get_shell_result(cmd)
 if debug:
     log_cmd_results(result)
@@ -351,7 +370,7 @@ if num_libs != 0:
     libs_byid_nodes_lst = []
     log('- Determining libraries\' by-id nodes from their sg nodes')
     for lib_sg in libs_sg_lst:
-        libs_byid_nodes_lst.append(re.sub('.* (scsi-.+?) ->.*/' + lib_sg + '.*', '\\1', dev_tape_by_id_txt, flags = re.DOTALL))
+        libs_byid_nodes_lst.append(re.sub('.* (.+?) ->.*/' + lib_sg + '.*', '\\1', dev_tape_by_id_txt, flags = re.DOTALL))
     log(' - Library by-id node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_byid_nodes_lst)))
 
 # Get a list of tape drives' st nodes
@@ -375,7 +394,7 @@ if num_drives != 0:
     drives_byid_nodes_lst = []
     log('- Determining drives\' by-id nodes from their st nodes')
     for drive_st in drives_st_lst:
-        drives_byid_nodes_lst.append(re.sub('.* (scsi-.+?) ->.*/n' + drive_st + '\n.*', '\\1', dev_tape_by_id_txt, flags = re.DOTALL))
+        drives_byid_nodes_lst.append(re.sub('.* (.+?) ->.*/n' + drive_st + '.*', '\\1', dev_tape_by_id_txt, flags = re.DOTALL))
     log(' - Tape drive by-id node' + ('s' if num_drives > 1 else '') + ': ' + str(', '.join(drives_byid_nodes_lst)))
 hdr = '[ Startup Complete ]'
 log('='*10 + hdr + '='*10)
@@ -389,8 +408,8 @@ if offline:
     # -----------------------------------------
     log('- The \'offline\' variable is True, sending all drives offline command')
     for drive_byid in drives_byid_nodes_lst:
-        log(' - Drive /dev/tape/by-id/' + drive_byid)
-        cmd = 'mt -f /dev/tape/by-id/' + drive_byid + ' offline'
+        log(' - Drive ' + byid_node_dir_str + '/' + drive_byid)
+        cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid + ' offline'
         if debug:
             log('mt command: ' + cmd)
         result = get_shell_result(cmd)
@@ -406,7 +425,7 @@ else:
 hdr = '\nUnloading All Tape Drives In The (' + str(num_libs) + ') Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in libs_byid_nodes_lst:
-    result = lib_or_drv_status('mtx -f /dev/tape/by-id/' + lib + ' status')
+    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
     num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
     hdr = '\n' + lib + ': Unloading (' + str(num_drives) + ') Tape Drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
@@ -429,7 +448,7 @@ for lib in libs_byid_nodes_lst:
 hdr = '\nIterating Through Each Library Found\n'
 log('\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in libs_byid_nodes_lst:
-    result = lib_or_drv_status('mtx -f /dev/tape/by-id/' + lib + ' status')
+    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
     num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
     hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
@@ -446,7 +465,7 @@ for lib in libs_byid_nodes_lst:
             log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
             slot, vol  = get_random_slot(lib)
             log('- Loading volume ' + vol + ' from slot ' + slot + ' into drive ' + str(drive_index))
-            cmd = 'mtx -f /dev/tape/by-id/' + lib + ' load ' + slot + ' ' + str(drive_index)
+            cmd = 'mtx -f ' + byid_node_dir_str + '/' + lib + ' load ' + slot + ' ' + str(drive_index)
             if debug:
                 log('mtx command: ' + cmd)
             result = get_shell_result(cmd)
@@ -464,10 +483,10 @@ for lib in libs_byid_nodes_lst:
             # ---------------------------------------------------------
             for drive_byid_node in drives_byid_nodes_lst:
                 if debug:
-                    log('- Checking drive by-id node \'/dev/tape/by-id/' + drive_byid_node + '\'')
-                result = lib_or_drv_status('mt -f /dev/tape/by-id/' + drive_byid_node + ' status')
+                    log('- Checking drive by-id node \'' + byid_node_dir_str + '/' + drive_byid_node + '\'')
+                result = lib_or_drv_status('mt -f ' + byid_node_dir_str + '/' + drive_byid_node + ' status')
                 if re.search(ready, result.stdout, re.DOTALL):
-                    log(' - ' + ready + ': Tape ' + vol + ' is loaded in /dev/tape/by-id/' + drive_byid_node)
+                    log(' - ' + ready + ': Tape ' + vol + ' is loaded in ' + byid_node_dir_str + '/' + drive_byid_node)
                     log('  - This is Bacula \'DriveIndex = ' + str(drive_index) + '\'')
                     # We found the drive with the tape loaded in it so
                     # add the current lib, by-id node, drive_index to the
@@ -498,7 +517,7 @@ for lib in libs_byid_nodes_lst:
         log('No drives were detected in this library, or it was intentionally skipped')
     else:
         for drive_index_tuple in lib_dict[lib]:
-            log('ArchiveDevice = /dev/tape/by-id/' + drive_index_tuple[0] + ' => DriveIndex = ' + str(drive_index_tuple[1]))
+            log('ArchiveDevice = ' + byid_node_dir_str + '/' + drive_index_tuple[0] + ' => DriveIndex = ' + str(drive_index_tuple[1]))
     log('')
 if len(drives_byid_nodes_lst) != 0:
     drives_byid_nodes_lst.sort()
@@ -542,7 +561,7 @@ for lib in lib_dict:
     res_txt = storage_autochanger_tpl
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
-    res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "/dev/tape/by-id/' + lib + '"')
+    res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
     dev_str = ' Device = '
     dev = 0
     autochanger_dev_str = ''
@@ -562,7 +581,7 @@ for lib in lib_dict:
             if drive_index_tuple[1] == dev:
                 archive_device = drive_index_tuple[0]
                 continue
-        drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "/dev/tape/by-id/' + archive_device + '"')
+        drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
         # Open and write Storage Device resource config file
         # --------------------------------------------------
         write_res_file(drv_res_file, drv_res_txt)
