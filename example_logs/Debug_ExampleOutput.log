@@ -1,8 +1,9 @@
 
 
-==========[ Starting ./bacula-resource-auto-creator.py v0.07 ]==========
-- Logging to file: /tmp/bacula-resource-auto-creator_20240211124257/bacula-resource-auto-creator_20240211124257.log
-- Getting OS's uname for use in other tests
+==========[ Starting ./bacula-resource-auto-creator.py v0.12 ]==========
+- Work directory: /tmp/bacula-resource-auto-creator_20240215164419
+- Logging to file: bacula-resource-auto-creator_20240215164419.log
+- Getting the OS uname for use in other tests
 shell command: uname
 returncode: 0
 stdout: Linux
@@ -12,105 +13,72 @@ mt command: mt --version | grep "GNU cpio"
 returncode: 1
 stdout: N/A
 stderr: N/A
+- Checking for lin_tape driver
+lsmod command: lsmod | grep "^lin_tape" | wc -l
+returncode: 0
+stdout: 0
+stderr: N/A
+ - Did not find the lin_tape kernel driver loaded
+Command 'ls -l /dev/tape/by-id | grep "^lrw"' output:
+returncode: 0
+stdout: 
+[begin stdout]
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab000100 -> ../../st1
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab000100-nst -> ../../nst1
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab000200 -> ../../st6
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab000200-nst -> ../../nst6
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab000300 -> ../../st4
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab000300-nst -> ../../nst4
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab000400 -> ../../st0
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab000400-nst -> ../../nst0
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab000900 -> ../../st2
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab000900-nst -> ../../nst2
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab001000 -> ../../st10
+lrwxrwxrwx 1 root root 11 Feb 14 17:14 scsi-350223344ab001000-nst -> ../../nst10
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab001100 -> ../../st11
+lrwxrwxrwx 1 root root 11 Feb 14 17:14 scsi-350223344ab001100-nst -> ../../nst11
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab001200 -> ../../st8
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab001200-nst -> ../../nst8
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab005100 -> ../../st9
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab005100-nst -> ../../nst9
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab005200 -> ../../st3
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab005200-nst -> ../../nst3
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab005300 -> ../../st5
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab005300-nst -> ../../nst5
+lrwxrwxrwx 1 root root  9 Feb 14 17:14 scsi-350223344ab005400 -> ../../st7
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-350223344ab005400-nst -> ../../nst7
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-SSTK_L700_XYZZY_A -> ../../sg13
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-SSTK_L80_WAA_A -> ../../sg16
+lrwxrwxrwx 1 root root 10 Feb 14 17:14 scsi-SSTK_L80_XYZZY_B -> ../../sg14
+[end stdout]
+stderr: N/A
+lsscsi command: lsscsi -g | grep "tape\|mediumx"
+returncode: 0
+stdout: 
+[begin stdout]
+[5:0:0:0]    mediumx STK      L700             0107  /dev/sch0  /dev/sg13
+[5:0:1:0]    tape    IBM      ULT3580-TD8      0107  /dev/st1   /dev/sg10
+[5:0:2:0]    tape    IBM      ULT3580-TD8      0107  /dev/st6   /dev/sg8 
+[5:0:3:0]    tape    IBM      ULT3580-TD6      0107  /dev/st4   /dev/sg7 
+[5:0:4:0]    tape    IBM      ULT3580-TD6      0107  /dev/st0   /dev/sg4 
+[5:0:8:0]    mediumx STK      L80              0107  /dev/sch1  /dev/sg14
+[5:0:9:0]    tape    STK      T10000B          0107  /dev/st2   /dev/sg5 
+[5:0:10:0]   tape    STK      T10000B          0107  /dev/st10  /dev/sg17
+[5:0:11:0]   tape    STK      T10000B          0107  /dev/st11  /dev/sg18
+[5:0:12:0]   tape    STK      T10000B          0107  /dev/st8   /dev/sg12
+[5:5:0:0]    mediumx STK      L80              0107  /dev/sch2  /dev/sg16
+[5:5:1:0]    tape    STK      T10000B          0107  /dev/st9   /dev/sg15
+[5:5:2:0]    tape    STK      T10000B          0107  /dev/st3   /dev/sg6 
+[5:5:3:0]    tape    STK      T10000B          0107  /dev/st5   /dev/sg11
+[5:5:4:0]    tape    STK      T10000B          0107  /dev/st7   /dev/sg9 
+[end stdout]
+stderr: N/A
 - Getting the list of tape libraries' sg nodes
-lsscsi command: lsscsi -g | grep mediumx | grep -o "sg[0-9]*" | sort
-returncode: 0
-stdout: 
-[begin stdout]
-sg16
-sg17
-sg9
-[end stdout]
-stderr: N/A
  - Found 3 libraries
-  - Library sg nodes: sg16, sg17, sg9
-Command 'lsscsi -g' output:
-returncode: 0
-stdout: 
-[begin stdout]
-[1:0:0:0]    cd/dvd  VBOX     CD-ROM           1.0   /dev/sr0   /dev/sg0 
-[2:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sda   /dev/sg1 
-[3:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sdb   /dev/sg2 
-[4:0:0:0]    disk    ATA      VBOX HARDDISK    1.0   /dev/sdc   /dev/sg3 
-[5:0:0:0]    mediumx STK      L700             0107  /dev/sch1  /dev/sg16
-[5:0:1:0]    tape    IBM      ULT3580-TD8      0107  /dev/st7   /dev/sg12
-[5:0:2:0]    tape    IBM      ULT3580-TD8      0107  /dev/st9   /dev/sg14
-[5:0:3:0]    tape    IBM      ULT3580-TD6      0107  /dev/st0   /dev/sg4 
-[5:0:4:0]    tape    IBM      ULT3580-TD6      0107  /dev/st8   /dev/sg13
-[5:0:8:0]    mediumx STK      L80              0107  /dev/sch2  /dev/sg17
-[5:0:9:0]    tape    STK      T10000B          0107  /dev/st6   /dev/sg11
-[5:0:10:0]   tape    STK      T10000B          0107  /dev/st2   /dev/sg6 
-[5:0:11:0]   tape    STK      T10000B          0107  /dev/st10  /dev/sg15
-[5:0:12:0]   tape    STK      T10000B          0107  /dev/st3   /dev/sg7 
-[5:5:0:0]    mediumx STK      L80              0107  /dev/sch0  /dev/sg9 
-[5:5:1:0]    tape    STK      T10000B          0107  /dev/st1   /dev/sg5 
-[5:5:2:0]    tape    STK      T10000B          0107  /dev/st11  /dev/sg18
-[5:5:3:0]    tape    STK      T10000B          0107  /dev/st5   /dev/sg10
-[5:5:4:0]    tape    STK      T10000B          0107  /dev/st4   /dev/sg8 
-[end stdout]
-stderr: N/A
-Command 'ls -la /dev/tape/by-id' output:
-returncode: 0
-stdout: 
-[begin stdout]
-total 0
-drwxr-xr-x 2 root root 580 Feb 10 22:06 .
-drwxr-xr-x 4 root root  80 Feb 10 22:06 ..
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab000100 -> ../../st7
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab000100-nst -> ../../nst7
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab000200 -> ../../st9
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab000200-nst -> ../../nst9
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab000300 -> ../../st0
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab000300-nst -> ../../nst0
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab000400 -> ../../st8
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab000400-nst -> ../../nst8
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab000900 -> ../../st6
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab000900-nst -> ../../nst6
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab001000 -> ../../st2
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab001000-nst -> ../../nst2
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab001100 -> ../../st10
-lrwxrwxrwx 1 root root  11 Feb 10 22:06 scsi-350223344ab001100-nst -> ../../nst10
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab001200 -> ../../st3
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab001200-nst -> ../../nst3
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab005100 -> ../../st1
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab005100-nst -> ../../nst1
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab005200 -> ../../st11
-lrwxrwxrwx 1 root root  11 Feb 10 22:06 scsi-350223344ab005200-nst -> ../../nst11
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab005300 -> ../../st5
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab005300-nst -> ../../nst5
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-350223344ab005400 -> ../../st4
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-350223344ab005400-nst -> ../../nst4
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-SSTK_L700_XYZZY_A -> ../../sg16
-lrwxrwxrwx 1 root root   9 Feb 10 22:06 scsi-SSTK_L80_WAA_A -> ../../sg9
-lrwxrwxrwx 1 root root  10 Feb 10 22:06 scsi-SSTK_L80_XYZZY_B -> ../../sg17
-[end stdout]
-stderr: N/A
+  - Library sg nodes: sg13, sg14, sg16
 - Determining libraries' by-id nodes from their sg nodes
  - Library by-id nodes: scsi-SSTK_L700_XYZZY_A, scsi-SSTK_L80_XYZZY_B, scsi-SSTK_L80_WAA_A
-- Getting the list of tape drives' st nodes
-lsscsi command: lsscsi -g | grep tape | grep -o "st[0-9]*" | sort
-returncode: 0
-stdout: 
-[begin stdout]
-st0
-st1
-st10
-st11
-st2
-st3
-st4
-st5
-st6
-st7
-st8
-st9
-[end stdout]
-stderr: N/A
- - Found 12 drives
-  - Tape drive st nodes: st0, st1, st10, st11, st2, st3, st4, st5, st6, st7, st8, st9
-- Determining drives' by-id nodes from their st nodes
- - Tape drive by-id nodes: scsi-350223344ab000300-nst, scsi-350223344ab005100-nst, scsi-350223344ab001100-nst, scsi-350223344ab005200-nst, scsi-350223344ab001000-nst, scsi-350223344ab001200-nst, scsi-350223344ab005400-nst, scsi-350223344ab005300-nst, scsi-350223344ab000900-nst, scsi-350223344ab000100-nst, scsi-350223344ab000400-nst, scsi-350223344ab000200-nst
-==========[ Startup Complete ]==========
+- Generating the tape drive list [("drive_byid_node", "st#", "sg#"),...]
 
 
 ==========================================================================
@@ -1095,7 +1063,7 @@ stderr: N/A
 ------------------------------------------------
 Library 'scsi-SSTK_L700_XYZZY_A' with (4) drives
 ------------------------------------------------
-- Skipping multi LTO drive mhVTL library: scsi-SSTK_L700_XYZZY_A
+- Skipping library: scsi-SSTK_L700_XYZZY_A
 
 Command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B status
 returncode: 0
@@ -1203,13 +1171,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G03039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G03036TA from slot 36 into drive 0
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 36 0
+- Loading volume G03004TA from slot 4 into drive 0
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 4 0
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 36 into drive 0...done
+stdout: Loading media from Storage Element 4 into drive 0...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -1224,8 +1220,8 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005100-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005100-nst status
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
 returncode: 0
 stdout: 
 [begin stdout]
@@ -1237,91 +1233,7 @@ General status bits on (50000):
  DR_OPEN IM_REP_EN
 [end stdout]
 stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005100-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab001100-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab001100-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab001100-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005200-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005200-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005200-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab001000-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab001000-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab001000-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab001200-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab001200-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab001200-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005400-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005400-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005400-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005300-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005300-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005300-nst' is empty
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000900-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000900-nst status
 returncode: 0
@@ -1335,13 +1247,13 @@ General status bits on (81010000):
  EOF ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G03036TA is loaded in /dev/tape/by-id/scsi-350223344ab000900-nst
+ - ONLINE: Tape G03004TA is loaded in /dev/tape/by-id/scsi-350223344ab000900-nst
   - This is Bacula 'DriveIndex = 0'
    - Unloading drive 0
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 36 0
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 4 0
     - Unload successful
 returncode: 0
-stdout: Unloading drive 0 into Storage Element 36...done
+stdout: Unloading drive 0 into Storage Element 4...done
 stderr: N/A
 ------------------------
 Identifying DriveIndex 1
@@ -1391,13 +1303,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G03039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G03033TA from slot 33 into drive 1
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 33 1
+- Loading volume G03036TA from slot 36 into drive 1
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 36 1
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 33 into drive 1...done
+stdout: Loading media from Storage Element 36 into drive 1...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -1412,8 +1352,8 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005100-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005100-nst status
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
 returncode: 0
 stdout: 
 [begin stdout]
@@ -1425,35 +1365,7 @@ General status bits on (50000):
  DR_OPEN IM_REP_EN
 [end stdout]
 stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005100-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab001100-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab001100-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab001100-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005200-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005200-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005200-nst' is empty
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab001000-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab001000-nst status
 returncode: 0
@@ -1467,13 +1379,13 @@ General status bits on (1010000):
  ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G03033TA is loaded in /dev/tape/by-id/scsi-350223344ab001000-nst
+ - ONLINE: Tape G03036TA is loaded in /dev/tape/by-id/scsi-350223344ab001000-nst
   - This is Bacula 'DriveIndex = 1'
    - Unloading drive 1
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 33 1
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 36 1
     - Unload successful
 returncode: 0
-stdout: Unloading drive 1 into Storage Element 33...done
+stdout: Unloading drive 1 into Storage Element 36...done
 stderr: N/A
 ------------------------
 Identifying DriveIndex 2
@@ -1523,13 +1435,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G03039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G03031TA from slot 31 into drive 2
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 31 2
+- Loading volume G03036TA from slot 36 into drive 2
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 36 2
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 31 into drive 2...done
+stdout: Loading media from Storage Element 36 into drive 2...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -1544,8 +1484,8 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005100-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005100-nst status
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
 returncode: 0
 stdout: 
 [begin stdout]
@@ -1557,7 +1497,7 @@ General status bits on (50000):
  DR_OPEN IM_REP_EN
 [end stdout]
 stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005100-nst' is empty
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab001100-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab001100-nst status
 returncode: 0
@@ -1571,13 +1511,13 @@ General status bits on (1010000):
  ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G03031TA is loaded in /dev/tape/by-id/scsi-350223344ab001100-nst
+ - ONLINE: Tape G03036TA is loaded in /dev/tape/by-id/scsi-350223344ab001100-nst
   - This is Bacula 'DriveIndex = 2'
    - Unloading drive 2
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 31 2
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 36 2
     - Unload successful
 returncode: 0
-stdout: Unloading drive 2 into Storage Element 31...done
+stdout: Unloading drive 2 into Storage Element 36...done
 stderr: N/A
 ------------------------
 Identifying DriveIndex 3
@@ -1627,13 +1567,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G03039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G03029TA from slot 29 into drive 3
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 29 3
+- Loading volume G03016TA from slot 16 into drive 3
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B load 16 3
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 29 into drive 3...done
+stdout: Loading media from Storage Element 16 into drive 3...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -1648,8 +1616,8 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005100-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005100-nst status
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
 returncode: 0
 stdout: 
 [begin stdout]
@@ -1661,21 +1629,7 @@ General status bits on (50000):
  DR_OPEN IM_REP_EN
 [end stdout]
 stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005100-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005200-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005200-nst status
-returncode: 0
-stdout: 
-[begin stdout]
-SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
-Tape block size 0 bytes. Density code 0x0 (default).
-Soft error count since last status=0
-General status bits on (50000):
- DR_OPEN IM_REP_EN
-[end stdout]
-stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005200-nst' is empty
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab001200-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab001200-nst status
 returncode: 0
@@ -1689,13 +1643,13 @@ General status bits on (1010000):
  ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G03029TA is loaded in /dev/tape/by-id/scsi-350223344ab001200-nst
+ - ONLINE: Tape G03016TA is loaded in /dev/tape/by-id/scsi-350223344ab001200-nst
   - This is Bacula 'DriveIndex = 3'
    - Unloading drive 3
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 29 3
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_XYZZY_B unload 16 3
     - Unload successful
 returncode: 0
-stdout: Unloading drive 3 into Storage Element 29...done
+stdout: Unloading drive 3 into Storage Element 16...done
 stderr: N/A
 
 Command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A status
@@ -1804,13 +1758,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G05039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G05032TA from slot 32 into drive 0
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 32 0
+- Loading volume G05014TA from slot 14 into drive 0
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 14 0
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 32 into drive 0...done
+stdout: Loading media from Storage Element 14 into drive 0...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -1825,26 +1807,40 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005100-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab005100-nst status
 returncode: 0
 stdout: 
 [begin stdout]
 SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
+File number=0, block number=0, partition=0.
 Tape block size 0 bytes. Density code 0x4a (no translation).
 Soft error count since last status=0
-General status bits on (1010000):
- ONLINE IM_REP_EN
+General status bits on (41010000):
+ BOT ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G05032TA is loaded in /dev/tape/by-id/scsi-350223344ab005100-nst
+ - ONLINE: Tape G05014TA is loaded in /dev/tape/by-id/scsi-350223344ab005100-nst
   - This is Bacula 'DriveIndex = 0'
    - Unloading drive 0
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 32 0
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 14 0
     - Unload successful
 returncode: 0
-stdout: Unloading drive 0 into Storage Element 32...done
+stdout: Unloading drive 0 into Storage Element 14...done
 stderr: N/A
 ------------------------
 Identifying DriveIndex 1
@@ -1894,13 +1890,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G05039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G05024TA from slot 24 into drive 1
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 24 1
+- Loading volume G05008TA from slot 8 into drive 1
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 8 1
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 24 into drive 1...done
+stdout: Loading media from Storage Element 8 into drive 1...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -1915,26 +1939,40 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005200-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab005200-nst status
 returncode: 0
 stdout: 
 [begin stdout]
 SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
+File number=0, block number=0, partition=0.
 Tape block size 0 bytes. Density code 0x4a (no translation).
 Soft error count since last status=0
-General status bits on (1010000):
- ONLINE IM_REP_EN
+General status bits on (41010000):
+ BOT ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G05024TA is loaded in /dev/tape/by-id/scsi-350223344ab005200-nst
+ - ONLINE: Tape G05008TA is loaded in /dev/tape/by-id/scsi-350223344ab005200-nst
   - This is Bacula 'DriveIndex = 1'
    - Unloading drive 1
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 24 1
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 8 1
     - Unload successful
 returncode: 0
-stdout: Unloading drive 1 into Storage Element 24...done
+stdout: Unloading drive 1 into Storage Element 8...done
 stderr: N/A
 ------------------------
 Identifying DriveIndex 2
@@ -1984,13 +2022,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G05039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G05020TA from slot 20 into drive 2
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 20 2
+- Loading volume G05003TA from slot 3 into drive 2
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 3 2
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 20 into drive 2...done
+stdout: Loading media from Storage Element 3 into drive 2...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -2005,8 +2071,8 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
-- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005400-nst'
-Command: mt -f /dev/tape/by-id/scsi-350223344ab005400-nst status
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
 returncode: 0
 stdout: 
 [begin stdout]
@@ -2018,27 +2084,27 @@ General status bits on (50000):
  DR_OPEN IM_REP_EN
 [end stdout]
 stderr: N/A
- - EMPTY: Drive by-id node 'scsi-350223344ab005400-nst' is empty
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab005300-nst status
 returncode: 0
 stdout: 
 [begin stdout]
 SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
+File number=0, block number=0, partition=0.
 Tape block size 0 bytes. Density code 0x4a (no translation).
 Soft error count since last status=0
-General status bits on (1010000):
- ONLINE IM_REP_EN
+General status bits on (41010000):
+ BOT ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G05020TA is loaded in /dev/tape/by-id/scsi-350223344ab005300-nst
+ - ONLINE: Tape G05003TA is loaded in /dev/tape/by-id/scsi-350223344ab005300-nst
   - This is Bacula 'DriveIndex = 2'
    - Unloading drive 2
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 20 2
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 3 2
     - Unload successful
 returncode: 0
-stdout: Unloading drive 2 into Storage Element 20...done
+stdout: Unloading drive 2 into Storage Element 3...done
 stderr: N/A
 ------------------------
 Identifying DriveIndex 3
@@ -2088,13 +2154,41 @@ stdout:
       Storage Element 39:Full :VolumeTag=G05039TA                            
 [end stdout]
 stderr: N/A
-- Loading volume G05003TA from slot 3 into drive 3
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 3 3
+- Loading volume G05022TA from slot 22 into drive 3
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A load 22 3
  - Loaded OK
 returncode: 0
-stdout: Loading media from Storage Element 3 into drive 3...done
+stdout: Loading media from Storage Element 22 into drive 3...done
 stderr: N/A
   - Sleeping 1 seconds to allow drive to settle
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000100-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000100-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000100-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000200-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000200-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000200-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000300-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab000300-nst status
 returncode: 0
@@ -2109,35 +2203,44 @@ General status bits on (50000):
 [end stdout]
 stderr: N/A
  - EMPTY: Drive by-id node 'scsi-350223344ab000300-nst' is empty
+- Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab000400-nst'
+Command: mt -f /dev/tape/by-id/scsi-350223344ab000400-nst status
+returncode: 0
+stdout: 
+[begin stdout]
+SCSI 2 tape drive:
+File number=-1, block number=-1, partition=0.
+Tape block size 0 bytes. Density code 0x0 (default).
+Soft error count since last status=0
+General status bits on (50000):
+ DR_OPEN IM_REP_EN
+[end stdout]
+stderr: N/A
+ - EMPTY: Drive by-id node 'scsi-350223344ab000400-nst' is empty
 - Checking drive by-id node '/dev/tape/by-id/scsi-350223344ab005400-nst'
 Command: mt -f /dev/tape/by-id/scsi-350223344ab005400-nst status
 returncode: 0
 stdout: 
 [begin stdout]
 SCSI 2 tape drive:
-File number=-1, block number=-1, partition=0.
+File number=0, block number=0, partition=0.
 Tape block size 0 bytes. Density code 0x4a (no translation).
 Soft error count since last status=0
-General status bits on (1010000):
- ONLINE IM_REP_EN
+General status bits on (41010000):
+ BOT ONLINE IM_REP_EN
 [end stdout]
 stderr: N/A
- - ONLINE: Tape G05003TA is loaded in /dev/tape/by-id/scsi-350223344ab005400-nst
+ - ONLINE: Tape G05022TA is loaded in /dev/tape/by-id/scsi-350223344ab005400-nst
   - This is Bacula 'DriveIndex = 3'
    - Unloading drive 3
-mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 3 3
+mtx command: mtx -f /dev/tape/by-id/scsi-SSTK_L80_WAA_A unload 22 3
     - Unload successful
 returncode: 0
-stdout: Unloading drive 3 into Storage Element 3...done
+stdout: Unloading drive 3 into Storage Element 22...done
 stderr: N/A
 
 
 ========[ Bacula Drive 'ArchiveDevice' => Bacula 'DriveIndex' settings ]========
--------------------------------
-Library: scsi-SSTK_L700_XYZZY_A
--------------------------------
-No drives were detected in this library, or it was intentionally skipped
-
 ------------------------------
 Library: scsi-SSTK_L80_XYZZY_B
 ------------------------------
@@ -2197,12 +2300,12 @@ Library: scsi-SSTK_L80_WAA_A
  - Storage Autochanger And Drive Device Resources Done
 
 
-===========================================================================================================
-DONE: Resource configuration files and script log file in: /tmp/bacula-resource-auto-creator_20240211124257
-NOTE: You *MUST* edit the following Director Storage resource files in the directory above:
+================================================================================================================
+DONE: Script output and Bacula resource configuration files in: /tmp/bacula-resource-auto-creator_20240215164419
+NOTE: Before use, you *MUST* edit the following Director Storage resource files:
       * DirectorStorage_Autochanger_SSTK_L80_XYZZY_B.cfg
       * DirectorStorage_Autochanger_SSTK_L80_WAA_A.cfg
-===========================================================================================================
-Bacula Resource Auto Creator - v0.07 - bacula-resource-auto-creator.py
-By: Bill Arlofski waa@revpol.com (c) February 11, 2024
+================================================================================================================
+Bacula Resource Auto Creator - v0.12 - bacula-resource-auto-creator.py
+By: Bill Arlofski waa@revpol.com (c) February 15, 2024
 
