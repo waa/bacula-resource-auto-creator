@@ -464,7 +464,7 @@ for lib in libs_byid_nodes_lst:
             # Test by-id device nodes with mt to identify drive's index
             # ---------------------------------------------------------
             for drive_byid_node in drive_byid_st_sg_lst:
-                if not debug:
+                if debug:
                     log('- Checking drive by-id node \'' + byid_node_dir_str + '/' + drive_byid_node[0] + '\'')
                 result = lib_or_drv_status('mt -f ' + byid_node_dir_str + '/' + drive_byid_node[0] + ' status')
                 if re.search(ready, result.stdout, re.DOTALL):
