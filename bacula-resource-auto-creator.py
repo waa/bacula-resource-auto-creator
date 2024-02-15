@@ -543,7 +543,7 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "Autochanger with (' \
             + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
-    res_txt = res_txt.replace('Address =', 'Address = "127.0.0.1"       # You *must* replace this with the correct FQDN!')
+    res_txt = res_txt.replace('Address =', 'Address = "127.0.0.1"       # You *must* replace this with the correct FQDN or IP address!')
     res_txt = res_txt.replace('Password =', 'Password = "wrongPassword"  # You *must* replace this with the correct password for the SD @ Address')
     res_txt = res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
@@ -595,11 +595,11 @@ for lib in lib_dict:
 
 # Print location of log file and resource config files
 # ----------------------------------------------------
-log('\n' + '='*107)
-log('DONE: Script output log file and Bacula resource configuration files in: ' + work_dir)
-log('NOTE: Before use, you *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ' in the directory above:')
+log('\n' + '='*112)
+log('DONE: Script output and Bacula resource configuration files in: ' + work_dir)
+log('NOTE: Before use, you *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ':')
 for lib in lib_dict:
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
     log('      * DirectorStorage_' + autochanger_name + '.cfg')
-log('='*107)
+log('='*112)
 log(prog_info_txt)
