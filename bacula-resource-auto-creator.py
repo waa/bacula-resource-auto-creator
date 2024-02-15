@@ -58,8 +58,8 @@ from datetime import datetime
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.11'
-reldate = 'February 14, 2024'
+version = '0.12'
+reldate = 'February 15, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -244,8 +244,8 @@ lower_name_and_time = progname.replace(' ', '-').lower() + '_' + date_stamp
 work_dir = '/tmp/' + lower_name_and_time
 log_file = work_dir + '/' + lower_name_and_time + '.log'
 
-# Create the lib_dict dictionary. It will hold {'libraryName': ('drive_byid_node', drive_index)...}
-# -------------------------------------------------------------------------------------------------
+# Create the lib_dict dictionary. It will hold {'libraryName': (index, 'drive_byid_node', 'st#', 'sg#'),...}
+# ----------------------------------------------------------------------------------------------------------
 lib_dict = {}
 
 # Create the work_dir directory
@@ -434,9 +434,6 @@ for lib in libs_byid_nodes_lst:
     num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
     hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
-    # Now iterate through each drive, load a tape in it
-    # and then check to see which drive by-id is loaded
-    # -------------------------------------------------
     if lib in libs_to_skip:
         log('- Skipping library: ' + lib + '\n')
         continue
@@ -471,10 +468,10 @@ for lib in libs_byid_nodes_lst:
                     log(' - ' + ready + ': Tape ' + vol + ' is loaded in ' + byid_node_dir_str + '/' + drive_byid_node[0])
                     log('  - This is Bacula \'DriveIndex = ' + str(drive_index) + '\'')
                     # We found the drive with the tape loaded in it so
-                    # add the current lib, by-id node, drive_index to the
-                    # lib_dict dictionary, and remove the by-id node from
-                    # the drive_byid_nodes_lst list
-                    # ---------------------------------------------------
+                    # add the current lib, drive_index, drive by-id node,
+                    # st# and sdg# to the lib_dict dictionary, and remove
+                    # the by-id node from the drive_byid_st_sg_lst list
+                    #  --------------------------------------------------
                     if lib in lib_dict:
                         lib_dict[lib].append((drive_index, drive_byid_node[0], drive_byid_node[1], drive_byid_node[2]))
                     else:
@@ -487,7 +484,7 @@ for lib in libs_byid_nodes_lst:
                     break
                 else:
                     if debug:
-                        log(' - EMPTY: Drive by-id node \'' + drive_byid_node + '\' is empty')
+                        log(' - EMPTY: Drive by-id node \'' + drive_byid_node[0] + '\' is empty')
             drive_index += 1
         log('')
 hdr = '[ Bacula Drive \'ArchiveDevice\' => Bacula \'DriveIndex\' settings ]'
