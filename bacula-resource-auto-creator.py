@@ -58,8 +58,8 @@ from datetime import datetime
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.10'
-reldate = 'February 13, 2024'
+version = '0.11'
+reldate = 'February 14, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -274,8 +274,8 @@ director_storage_tpl = """Storage {
 storage_autochanger_tpl = """Autochanger {
   Name =
   Description =
-  ChangerCommand = "/opt/bacula/scripts/mtx-changer %c %o %S %a %d"
   ChangerDevice =
+  ChangerCommand = "/opt/bacula/scripts/mtx-changer %c %o %S %a %d"
   Device =
 }"""
 
@@ -292,6 +292,8 @@ storage_device_tpl = """Device {
   RandomAccess = no
   RemovableMedia = yes
   MaximumConcurrentJobs = 1
+  ControlDevice =
+  Alert Command = "/opt/bacula/scripts/tapealert %l"
   ArchiveDevice =
 }"""
 
@@ -330,39 +332,36 @@ else:
     # lin_tape = False
     byid_node_dir_str = '/dev/tape/by-id'
 
-# Get the list of tape libraries' sg nodes
-# ----------------------------------------
-log('- Getting the list of tape libraries\' sg nodes')
-cmd = 'lsscsi -g | grep mediumx | grep -o "sg[0-9]*" | sort'
+# Create the byid_txt from all symlinks in /dev/(tape|lin_tape)/by-id directory
+# -----------------------------------------------------------------------------
+cmd = 'ls -l ' + byid_node_dir_str + ' | grep "^lrw"'
+if debug:
+    log('Command \'' + cmd + '\' output:')
+result = get_shell_result(cmd)
+if debug:
+    log_cmd_results(result)
+chk_cmd_result(result, cmd)
+byid_txt = result.stdout.rstrip('\n')
+
+# Get lsscsi output for use later to determine Library and tape drive sg# nodes
+# -----------------------------------------------------------------------------
+cmd = 'lsscsi -g | grep "tape\|mediumx"'
 if debug:
     log('lsscsi command: ' + cmd)
 result = get_shell_result(cmd)
 if debug:
     log_cmd_results(result)
 chk_cmd_result(result, cmd)
-libs_sg_lst = result.stdout.rstrip('\n').split('\n')
+result = get_shell_result(cmd)
+lsscsi_txt = result.stdout.rstrip('\n')
+
+# Get the list of tape libraries' sg nodes
+# ----------------------------------------
+log('- Getting the list of tape libraries\' sg nodes')
+libs_sg_lst = re.findall('.* mediumx .*/(sg\d{1,3})', lsscsi_txt)
 num_libs = len(libs_sg_lst)
 log(' - Found ' + str(num_libs) + ' librar' + ('ies' if num_libs == 0 or num_libs > 1 else 'y'))
 log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_sg_lst)))
-
-# waa - 20240203 - Need to see the /dev/tape/by-id directory and compare to lsscsi output
-# ---------------------------------------------------------------------------------------
-cmd = 'lsscsi -g'
-if debug:
-    log('Command \'' + cmd + '\' output:')
-result = get_shell_result(cmd)
-if debug:
-    log_cmd_results(result)
-chk_cmd_result(result, cmd)
-
-cmd = 'ls -la ' + byid_node_dir_str
-if debug:
-    log('Command \'' + cmd + '\' output:')
-result = get_shell_result(cmd)
-if debug:
-    log_cmd_results(result)
-chk_cmd_result(result, cmd)
-dev_tape_by_id_txt = result.stdout.rstrip('\n')
 
 # From the libraries' sg nodes, get the corresponding by-id node
 # --------------------------------------------------------------
@@ -370,46 +369,29 @@ if num_libs != 0:
     libs_byid_nodes_lst = []
     log('- Determining libraries\' by-id nodes from their sg nodes')
     for lib_sg in libs_sg_lst:
-        libs_byid_nodes_lst.append(re.sub('.* (.+?) ->.*/' + lib_sg + '.*', '\\1', dev_tape_by_id_txt, flags = re.DOTALL))
+        libs_byid_nodes_lst.append(re.sub('.* (.+?) ->.*/' + lib_sg + '.*', '\\1', byid_txt, flags = re.DOTALL))
     log(' - Library by-id node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_byid_nodes_lst)))
 
-# Get a list of tape drives' st nodes
-# -----------------------------------
-log('- Getting the list of tape drives\' st nodes')
-cmd = 'lsscsi -g | grep tape | grep -o "st[0-9]*" | sort'
-if debug:
-    log('lsscsi command: ' + cmd)
-result = get_shell_result(cmd)
-if debug:
-    log_cmd_results(result)
-chk_cmd_result(result, cmd)
-drives_st_lst = result.stdout.rstrip('\n').split('\n')
-num_drives = len(drives_st_lst)
-log(' - Found ' + str(num_drives) + ' drive' + ('s' if num_drives == 0 or num_drives > 1 else ''))
-log('  - Tape drive st node' + ('s' if num_drives > 1 else '') + ': ' + str(', '.join(drives_st_lst)))
-
-# From the drives' st nodes, get the corresponding by-id 'nst' node
-# -----------------------------------------------------------------
-if num_drives != 0:
-    drives_byid_nodes_lst = []
-    log('- Determining drives\' by-id nodes from their st nodes')
-    for drive_st in drives_st_lst:
-        drives_byid_nodes_lst.append(re.sub('.* (.+?) ->.*/n' + drive_st + '.*', '\\1', dev_tape_by_id_txt, flags = re.DOTALL))
-    log(' - Tape drive by-id node' + ('s' if num_drives > 1 else '') + ': ' + str(', '.join(drives_byid_nodes_lst)))
-hdr = '[ Startup Complete ]'
-log('='*10 + hdr + '='*10)
+# Get each drive's by-id node, nst# node, and sg# node and create
+# the drive_byid_st_sg_lst [('drive_byid_node', 'st#', 'sg#'),...]
+# ----------------------------------------------------------------
+log('- Generating the tape drive list [("drive_byid_node", "st#", "sg#"),...]')
+drive_byid_st_sg_lst = []
+for tuple in re.findall('.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
+    sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\d+)', result.stdout)
+    drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
 
 # If 'offline' is True send the offline command to all drives first
 # -----------------------------------------------------------------
 hdr = '\nChecking if we send \'offline\' command to all drives in the Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
-if offline:
+if  offline:
     # First send each drive the offline command
     # -----------------------------------------
     log('- The \'offline\' variable is True, sending all drives offline command')
-    for drive_byid in drives_byid_nodes_lst:
-        log(' - Drive ' + byid_node_dir_str + '/' + drive_byid)
-        cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid + ' offline'
+    for drive_byid in drive_byid_st_sg_lst:
+        log(' - Drive ' + byid_node_dir_str + '/' + drive_byid[0])
+        cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid[0] + ' offline'
         if debug:
             log('mt command: ' + cmd)
         result = get_shell_result(cmd)
@@ -481,12 +463,12 @@ for lib in libs_byid_nodes_lst:
 
             # Test by-id device nodes with mt to identify drive's index
             # ---------------------------------------------------------
-            for drive_byid_node in drives_byid_nodes_lst:
-                if debug:
-                    log('- Checking drive by-id node \'' + byid_node_dir_str + '/' + drive_byid_node + '\'')
-                result = lib_or_drv_status('mt -f ' + byid_node_dir_str + '/' + drive_byid_node + ' status')
+            for drive_byid_node in drive_byid_st_sg_lst:
+                if not debug:
+                    log('- Checking drive by-id node \'' + byid_node_dir_str + '/' + drive_byid_node[0] + '\'')
+                result = lib_or_drv_status('mt -f ' + byid_node_dir_str + '/' + drive_byid_node[0] + ' status')
                 if re.search(ready, result.stdout, re.DOTALL):
-                    log(' - ' + ready + ': Tape ' + vol + ' is loaded in ' + byid_node_dir_str + '/' + drive_byid_node)
+                    log(' - ' + ready + ': Tape ' + vol + ' is loaded in ' + byid_node_dir_str + '/' + drive_byid_node[0])
                     log('  - This is Bacula \'DriveIndex = ' + str(drive_index) + '\'')
                     # We found the drive with the tape loaded in it so
                     # add the current lib, by-id node, drive_index to the
@@ -494,10 +476,10 @@ for lib in libs_byid_nodes_lst:
                     # the drive_byid_nodes_lst list
                     # ---------------------------------------------------
                     if lib in lib_dict:
-                        lib_dict[lib].append((drive_byid_node, drive_index))
+                        lib_dict[lib].append((drive_index, drive_byid_node[0], drive_byid_node[1], drive_byid_node[2]))
                     else:
-                        lib_dict[lib] = [(drive_byid_node, drive_index)]
-                    drives_byid_nodes_lst.remove(drive_byid_node)
+                        lib_dict[lib] = [(drive_index, drive_byid_node[0], drive_byid_node[1], drive_byid_node[2])]
+                    drive_byid_st_sg_lst.remove(drive_byid_node)
                     # Now unload the drive
                     # --------------------
                     log('   - Unloading drive ' + str(drive_index))
@@ -510,20 +492,17 @@ for lib in libs_byid_nodes_lst:
         log('')
 hdr = '[ Bacula Drive \'ArchiveDevice\' => Bacula \'DriveIndex\' settings ]'
 log('\n' + '='*8 + hdr + '='*8) 
-for lib in libs_byid_nodes_lst:
+for lib in lib_dict:
     hdr = '\nLibrary: ' + lib + '\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
-    if lib not in lib_dict:
-        log('No drives were detected in this library, or it was intentionally skipped')
-    else:
-        for drive_index_tuple in lib_dict[lib]:
-            log('ArchiveDevice = ' + byid_node_dir_str + '/' + drive_index_tuple[0] + ' => DriveIndex = ' + str(drive_index_tuple[1]))
+    for index_byid_st_sg_tuple in lib_dict[lib]:
+        log('ArchiveDevice = ' + byid_node_dir_str + '/' + index_byid_st_sg_tuple[1] + ' => DriveIndex = ' + str(index_byid_st_sg_tuple[0]))
     log('')
-if len(drives_byid_nodes_lst) != 0:
-    drives_byid_nodes_lst.sort()
-    hdr = '\nStand Alone Drive' + ('s' if len(drives_byid_nodes_lst) > 1 else '') + ' (May be in a library that was skipped)\n'
+if len(drive_byid_st_sg_lst) != 0:
+    drive_byid_st_sg_lst.sort()
+    hdr = '\nStand Alone Drive' + ('s' if len(drive_byid_st_sg_lst) > 1 else '') + ' (May be in a library that was skipped)\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
-    log(', '.join(drives_byid_nodes_lst))
+    log(', '.join([byid for byid, st, sg in drive_byid_st_sg_lst]))
 log('='*80)
 
 # Generate the Bacula resource cut-n-paste configurations
@@ -577,11 +556,13 @@ for lib in lib_dict:
                     + ' in ' + autochanger_name + ' - ' +created_by_str + '"')
         drv_res_txt = drv_res_txt.replace('DriveIndex =', 'DriveIndex = ' + str(dev))
         drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-        for drive_index_tuple in lib_dict[lib]:
-            if drive_index_tuple[1] == dev:
-                archive_device = drive_index_tuple[0]
+        for index_byid_st_sg_tuple in lib_dict[lib]:
+            if index_byid_st_sg_tuple[0] == dev:
+                archive_device = index_byid_st_sg_tuple[1]
+                control_device = index_byid_st_sg_tuple[3]
                 continue
         drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
+        drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
         # Open and write Storage Device resource config file
         # --------------------------------------------------
         write_res_file(drv_res_file, drv_res_txt)
