@@ -293,7 +293,7 @@ storage_device_tpl = """Device {
   RemovableMedia = yes
   MaximumConcurrentJobs = 1
   ControlDevice =
-  Alert Command = "/opt/bacula/scripts/tapealert %l"
+  AlertCommand = "/opt/bacula/scripts/tapealert %l"
   ArchiveDevice =
 }"""
 
@@ -509,13 +509,12 @@ log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in lib_dict:
     hdr = '\nLibrary: ' + lib + '\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
-    log('- Generating Director Storage Resource')
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
 
     # Director Storage
     # ----------------
-    res_file = work_dir + '/DirectorStorage_' + autochanger_name + '.cfg'
     res_txt = director_storage_tpl
+    log('- Generating Director Storage Resource')
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "Autochanger with (' \
             + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
@@ -527,14 +526,14 @@ for lib in lib_dict:
     res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
     # Open and write Director Storage resource config file
     # ----------------------------------------------------
+    res_file = work_dir + '/DirectorStorage_' + autochanger_name + '.cfg'
     write_res_file(res_file, res_txt)
     log(' - Done')
 
     # Storage Autochanger
     # -------------------
-    log('- Generating Storage Autochanger And Device Resources')
-    res_file = work_dir + '/StorageAutochanger_' + autochanger_name + '.cfg'
     res_txt = storage_autochanger_tpl
+    log('- Generating Storage Autochanger And Device Resources')
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
     res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
@@ -542,12 +541,11 @@ for lib in lib_dict:
     dev = 0
     autochanger_dev_str = ''
     while dev < len(lib_dict[lib]):
+        # Create a Storage Device resource config file for each drive device in the Autochanger
+        # -------------------------------------------------------------------------------------
+        drv_res_txt = storage_device_tpl
         log(' - Generating Device Resource: ' + autochanger_name + '_Dev' + str(dev))
         autochanger_dev_str += '"' + autochanger_name + '_Dev' + str(dev) + '"' + (', ' if dev <= (len(lib_dict[lib]) - 2) else '')
-        # Create matching Storage Device resource config for each drive device
-        # --------------------------------------------------------------------
-        drv_res_file = work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg'
-        drv_res_txt = storage_device_tpl
         drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Drive ' + str(dev) \
                     + ' in ' + autochanger_name + ' - ' +created_by_str + '"')
@@ -562,12 +560,14 @@ for lib in lib_dict:
         drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
         # Open and write Storage Device resource config file
         # --------------------------------------------------
+        drv_res_file = work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg'
         write_res_file(drv_res_file, drv_res_txt)
         dev += 1
         log('  - Done')
     res_txt = res_txt.replace(' Device =', ' Device = ' + autochanger_dev_str)
     # Open and write Storage Autochanger config file
     # ----------------------------------------------
+    res_file = work_dir + '/StorageAutochanger_' + autochanger_name + '.cfg'
     write_res_file(res_file, res_txt)
     log(' - Storage Autochanger And Drive Device Resources Done\n')
 
