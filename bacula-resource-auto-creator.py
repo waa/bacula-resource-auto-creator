@@ -58,8 +58,8 @@ from datetime import datetime
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.12'
-reldate = 'February 15, 2024'
+version = '0.13'
+reldate = 'February 17, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -125,8 +125,12 @@ def log_cmd_results(result):
 def chk_cmd_result(result, cmd):
     'Given a result object, check the returncode, then log and exit if non zero.'
     if result.returncode != 0:
-        log('ERROR calling: ' + cmd)
-        log('Exiting with errorlevel ' + str(result.returncode))
+        if 'Device or resource busy' in result.stderr:
+            log('  - Device is "busy", probably locked by another process. Please be sure \'bacula-sd\' is not running')
+            log('   - Exiting with errorlevel ' + str(result.returncode))
+        log_cmd_results(result)
+        log('\n' + '='*75)
+        log(prog_info_txt)
         sys.exit(result.returncode)
 
 def get_shell_result(cmd):
@@ -140,8 +144,6 @@ def get_uname():
     if debug:
         log('shell command: ' + cmd)
     result = get_shell_result(cmd)
-    if debug:
-        log_cmd_results(result)
     chk_cmd_result(result, cmd)
     return result.stdout.rstrip('\n')
 
@@ -182,8 +184,6 @@ def lib_or_drv_status(cmd):
     if debug:
         log('Command: ' + cmd)
     result = get_shell_result(cmd)
-    if debug:
-        log_cmd_results(result)
     chk_cmd_result(result, cmd)
     return result
 
@@ -222,8 +222,6 @@ def unload(lib, slot, drive):
         log('    - Unload successful')
     else:
         log('    - Unload failed')
-    if debug:
-        log_cmd_results(result)
     chk_cmd_result(result, cmd)
     return
 
@@ -262,13 +260,23 @@ created_by_str = 'Created by ' + progname + ' v' + version + ' - ' + date_stamp
 director_storage_tpl = """Storage {
   Name =
   Description =
-  Address =
-  Password =
   Autochanger =
   Device =
-  MaximumConcurrentJobs =
   MediaType =
   SdPort = 9103
+
+  # You *must* replace this Address with the correct FQDN or IP address!
+  # --------------------------------------------------------------------
+  Address =
+
+  # You *must* replace this Password with the correct password for the SD @ Address above
+  # -------------------------------------------------------------------------------------
+  Password =
+
+  # MaximumConcurrentJobs is automatically set to the number of drive devices in the SD's
+  # Autochanger. It may need to be increased if changes are made to the drive device(s)
+  # -------------------------------------------------------------------------------------
+  MaximumConcurrentJobs =
 }"""
 
 storage_autochanger_tpl = """Autochanger {
@@ -291,10 +299,13 @@ storage_device_tpl = """Device {
   LabelMedia = no
   RandomAccess = no
   RemovableMedia = yes
-  MaximumConcurrentJobs = 1
   ControlDevice =
   AlertCommand = "/opt/bacula/scripts/tapealert %l"
   ArchiveDevice =
+
+  # MaximumConcurrentJobs here, and in the Director's Storage resource should probably be increased
+  # -----------------------------------------------------------------------------------------------
+  MaximumConcurrentJobs = 1
 }"""
 
 # Log the startup header
@@ -320,8 +331,6 @@ cmd = 'lsmod | grep "^lin_tape" | wc -l'
 if debug:
     log('lsmod command: ' + cmd)
 result = get_shell_result(cmd)
-if debug:
-    log_cmd_results(result)
 chk_cmd_result(result, cmd)
 if result.stdout.rstrip('\n') == '1':
     log(' - Found the lin_tape kernel driver loaded')
@@ -338,8 +347,6 @@ cmd = 'ls -l ' + byid_node_dir_str + ' | grep "^lrw"'
 if debug:
     log('Command \'' + cmd + '\' output:')
 result = get_shell_result(cmd)
-if debug:
-    log_cmd_results(result)
 chk_cmd_result(result, cmd)
 byid_txt = result.stdout.rstrip('\n')
 
@@ -349,8 +356,6 @@ cmd = 'lsscsi -g | grep "tape\|mediumx"'
 if debug:
     log('lsscsi command: ' + cmd)
 result = get_shell_result(cmd)
-if debug:
-    log_cmd_results(result)
 chk_cmd_result(result, cmd)
 result = get_shell_result(cmd)
 lsscsi_txt = result.stdout.rstrip('\n')
@@ -395,8 +400,6 @@ if  offline:
         if debug:
             log('mt command: ' + cmd)
         result = get_shell_result(cmd)
-        if debug:
-            log_cmd_results(result)
         chk_cmd_result(result, cmd)
 else:
     log('- The \'offline\' variable is False, skip sending offline commands')
@@ -452,8 +455,6 @@ for lib in libs_byid_nodes_lst:
                 log(' - Loaded OK')
             else:
                 log(' - Load FAILED')
-            if debug:
-                log_cmd_results(result)
             chk_cmd_result(result, cmd)
             log('  - Sleeping ' + str(sleep_secs) + ' seconds to allow drive to settle')
             sleep(sleep_secs)
@@ -518,10 +519,17 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "Autochanger with (' \
             + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
-    res_txt = res_txt.replace('Address =', 'Address = "127.0.0.1"       # You *must* replace this with the correct FQDN or IP address!')
-    res_txt = res_txt.replace('Password =', 'Password = "wrongPassword"  # You *must* replace this with the correct password for the SD @ Address')
+    # TODO: waa - 20240217 - Prompt for the remote SD's Address (test if it is
+    #       a valid IP, resolve and prompt "is this OK" if host or FQDN is given
+    # --------------------------------------------------------------------------
+    res_txt = res_txt.replace('Address =', 'Address = "127.0.0.1"')
+    # TODO: waa - 20240217 - Prompt for the remote SD's password
+    # ----------------------------------------------------------
+    res_txt = res_txt.replace('Password =', 'Password = "wrongPassword"')
     res_txt = res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
+    # TODO: waa - 20240217 - Prompt for the MaximumConcurrentJobs each drive device in Autochangers should use (default = 1)
+    # ----------------------------------------------------------------------------------------------------------------------
     res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = ' + str(len(lib_dict[lib])))
     res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
     # Open and write Director Storage resource config file
