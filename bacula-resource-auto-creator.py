@@ -50,16 +50,18 @@
 import os
 import re
 import sys
+import socket
 import subprocess
 from time import sleep
 from random import randint
 from datetime import datetime
+from ipaddress import ip_address, IPv4Address
 
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.13'
-reldate = 'February 17, 2024'
+version = '0.14'
+reldate = 'February 18, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -230,6 +232,48 @@ def write_res_file(filename, text):
     with open(filename, 'a+') as file:
         file.write(text)
 
+def is_ip_address(address):
+    'Given a string, determine if it is a valid IP address'
+    try:
+        ip_address(address)
+        return True
+    except ValueError:
+        return False
+
+def resolve(address):
+    'Given a string, determine if it is resolvable to an IP address'
+    try:
+        data = socket.gethostbyname_ex(address)
+        return data[2][0]
+    except Exception:
+        return False
+
+def get_ip_address(address):
+    'Given an address string, check if it is an IP, if not try to resolve it, and return an IP address'
+    if is_ip_address(address):
+        print(' - \'' + address + '\' is an IP address')
+        return address
+    else:
+        print(' - \'' + address + '\' is not an IP address. Attempting to resolve...')
+        ip = resolve(address)
+        if ip == False:
+            print('  - Oops, cannot resolve FQDN/host \'' + address + '\'')
+            return False
+        else:
+            print('  - FQDN/host \'' + address + '\' resolves to IP address: ' + ip)
+            return address
+
+def get_sd_addr():
+    'Request the FQDN, Hostname, or IP address, then verify it is an IP address or is resolvable.'
+    i = input('- Please enter the FQDN (preferred), Hostname, or IP address that the Director & Clients will use to contact this SD: ').strip()
+    sd_addr = get_ip_address(i)
+    if not sd_addr:
+        print('  - The Hostname or FQDN \'' + i + '\' does not resolve to an IP address')
+        print('  - Please try again')
+        return False
+    else:
+        return sd_addr
+
 # ================
 # BEGIN THE SCRIPT
 # ================
@@ -263,21 +307,16 @@ director_storage_tpl = """Storage {
   Autochanger =
   Device =
   MediaType =
-  SdPort = 9103
-
-  # You *must* replace this Address with the correct FQDN or IP address!
-  # --------------------------------------------------------------------
   Address =
-
-  # You *must* replace this Password with the correct password for the SD @ Address above
-  # -------------------------------------------------------------------------------------
   Password =
+  SdPort = 9103
 
   # MaximumConcurrentJobs is automatically set to the number of drive devices in the SD's
   # Autochanger. It may need to be increased if changes are made to the drive device(s)
   # -------------------------------------------------------------------------------------
   MaximumConcurrentJobs =
-}"""
+}
+"""
 
 storage_autochanger_tpl = """Autochanger {
   Name =
@@ -285,7 +324,8 @@ storage_autochanger_tpl = """Autochanger {
   ChangerDevice =
   ChangerCommand = "/opt/bacula/scripts/mtx-changer %c %o %S %a %d"
   Device =
-}"""
+}
+"""
 
 storage_device_tpl = """Device {
   Name =
@@ -306,7 +346,8 @@ storage_device_tpl = """Device {
   # MaximumConcurrentJobs here, and in the Director's Storage resource should probably be increased
   # -----------------------------------------------------------------------------------------------
   MaximumConcurrentJobs = 1
-}"""
+}
+"""
 
 # Log the startup header
 # ----------------------
@@ -323,6 +364,31 @@ uname = get_uname()
 # to know when a drive is loaded and ready.
 # -------------------------------------------
 ready = get_ready_str()
+
+# Ask for the Hostname, FQDN, or IP address of this SD
+# and verify that the Hostname or FQDN resolves to an IP
+# address before using it in the Director's Storage resource
+# ----------------------------------------------------------
+sd_addr = False
+while not sd_addr:
+    sd_addr = get_sd_addr()
+print('  - Will use \'Address = "' + sd_addr + '"\' in the Director Storage resource to contact this SD')
+
+# Ask for the password neded to contact this SD from the Director
+# ---------------------------------------------------------------
+sd_pass = False
+while not sd_pass:
+    sd_pass = input('- Please enter the password the Director will use to contact this SD: ').strip()
+    if len(sd_pass) == 0:
+        print('  - Password cannot be an empty string')
+        sd_pass = False
+        continue
+    else:
+        sd_pass_ok = input(' - Is the password \'' + sd_pass + '\' OK to use? [Y/n]: ').strip() or 'Y'
+        if sd_pass_ok not in ('Y', 'y'):
+            sd_pass = False
+        else:
+            print('  - Will use \'Password = "' + sd_pass + '"\' in the Director Storage resource to contact this SD')
 
 # Check for lin_tape driver
 # -------------------------
@@ -519,13 +585,8 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "Autochanger with (' \
             + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
-    # TODO: waa - 20240217 - Prompt for the remote SD's Address (test if it is
-    #       a valid IP, resolve and prompt "is this OK" if host or FQDN is given
-    # --------------------------------------------------------------------------
-    res_txt = res_txt.replace('Address =', 'Address = "127.0.0.1"')
-    # TODO: waa - 20240217 - Prompt for the remote SD's password
-    # ----------------------------------------------------------
-    res_txt = res_txt.replace('Password =', 'Password = "wrongPassword"')
+    res_txt = res_txt.replace('Address =', 'Address = "' + sd_addr + '"')
+    res_txt = res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
     res_txt = res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
     # TODO: waa - 20240217 - Prompt for the MaximumConcurrentJobs each drive device in Autochangers should use (default = 1)
