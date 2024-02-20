@@ -1,15 +1,15 @@
 
 
-==========[ Starting ./bacula-resource-auto-creator.py v0.11 ]==========
-- Work directory: /tmp/bacula-resource-auto-creator_20240215162623
-- Logging to file: bacula-resource-auto-creator_20240215162623.log
+==========[ Starting ./bacula-resource-auto-creator.py v0.14 ]==========
+- Work directory: /tmp/bacula-resource-auto-creator_20240219183050
+- Logging to file: bacula-resource-auto-creator_20240219183050.log
 - Getting the OS uname for use in other tests
 - Determining the correct mt "ready" string
 - Checking for lin_tape driver
  - Did not find the lin_tape kernel driver loaded
 - Getting the list of tape libraries' sg nodes
  - Found 3 libraries
-  - Library sg nodes: sg13, sg14, sg16
+  - Library sg nodes: sg16, sg18, sg17
 - Determining libraries' by-id nodes from their sg nodes
  - Library by-id nodes: scsi-SSTK_L700_XYZZY_A, scsi-SSTK_L80_XYZZY_B, scsi-SSTK_L80_WAA_A
 - Generating the tape drive list [("drive_byid_node", "st#", "sg#"),...]
@@ -40,41 +40,25 @@ scsi-SSTK_L700_XYZZY_A: Unloading (4) Tape Drives
 scsi-SSTK_L80_XYZZY_B: Unloading (4) Tape Drives
 ------------------------------------------------
 - Checking if a tape is in drive 0
- - Drive 0 is loaded with volume G03001TA from slot 1
-  - Unloading volume G03001TA from drive 0 to slot 1
-    - Unload successful
+ - Drive 0 is empty
 - Checking if a tape is in drive 1
- - Drive 1 is loaded with volume G03002TA from slot 2
-  - Unloading volume G03002TA from drive 1 to slot 2
-    - Unload successful
+ - Drive 1 is empty
 - Checking if a tape is in drive 2
- - Drive 2 is loaded with volume G03003TA from slot 3
-  - Unloading volume G03003TA from drive 2 to slot 3
-    - Unload successful
+ - Drive 2 is empty
 - Checking if a tape is in drive 3
- - Drive 3 is loaded with volume G03004TA from slot 4
-  - Unloading volume G03004TA from drive 3 to slot 4
-    - Unload successful
+ - Drive 3 is empty
 
 ----------------------------------------------
 scsi-SSTK_L80_WAA_A: Unloading (4) Tape Drives
 ----------------------------------------------
 - Checking if a tape is in drive 0
- - Drive 0 is loaded with volume G05001TA from slot 1
-  - Unloading volume G05001TA from drive 0 to slot 1
-    - Unload successful
+ - Drive 0 is empty
 - Checking if a tape is in drive 1
- - Drive 1 is loaded with volume G05002TA from slot 2
-  - Unloading volume G05002TA from drive 1 to slot 2
-    - Unload successful
+ - Drive 1 is empty
 - Checking if a tape is in drive 2
- - Drive 2 is loaded with volume G05003TA from slot 3
-  - Unloading volume G05003TA from drive 2 to slot 3
-    - Unload successful
+ - Drive 2 is empty
 - Checking if a tape is in drive 3
- - Drive 3 is loaded with volume G05004TA from slot 4
-  - Unloading volume G05004TA from drive 3 to slot 4
-    - Unload successful
+ - Drive 3 is empty
 
 
 ====================================
@@ -91,40 +75,40 @@ Library 'scsi-SSTK_L80_XYZZY_B' with (4) drives
 ------------------------
 Identifying DriveIndex 0
 ------------------------
-- Loading volume G03039TA from slot 39 into drive 0
+- Loading volume G03017TA from slot 17 into drive 0
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03039TA is loaded in /dev/tape/by-id/scsi-350223344ab000900-nst
+ - ONLINE: Tape G03017TA is loaded in /dev/tape/by-id/scsi-350223344ab000900-nst
   - This is Bacula 'DriveIndex = 0'
    - Unloading drive 0
     - Unload successful
 ------------------------
 Identifying DriveIndex 1
 ------------------------
-- Loading volume G03002TA from slot 2 into drive 1
+- Loading volume G03020TA from slot 20 into drive 1
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03002TA is loaded in /dev/tape/by-id/scsi-350223344ab001000-nst
+ - ONLINE: Tape G03020TA is loaded in /dev/tape/by-id/scsi-350223344ab001000-nst
   - This is Bacula 'DriveIndex = 1'
    - Unloading drive 1
     - Unload successful
 ------------------------
 Identifying DriveIndex 2
 ------------------------
-- Loading volume G03018TA from slot 18 into drive 2
+- Loading volume G03006TA from slot 6 into drive 2
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03018TA is loaded in /dev/tape/by-id/scsi-350223344ab001100-nst
+ - ONLINE: Tape G03006TA is loaded in /dev/tape/by-id/scsi-350223344ab001100-nst
   - This is Bacula 'DriveIndex = 2'
    - Unloading drive 2
     - Unload successful
 ------------------------
 Identifying DriveIndex 3
 ------------------------
-- Loading volume G03032TA from slot 32 into drive 3
+- Loading volume G03029TA from slot 29 into drive 3
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03032TA is loaded in /dev/tape/by-id/scsi-350223344ab001200-nst
+ - ONLINE: Tape G03029TA is loaded in /dev/tape/by-id/scsi-350223344ab001200-nst
   - This is Bacula 'DriveIndex = 3'
    - Unloading drive 3
     - Unload successful
@@ -135,40 +119,40 @@ Library 'scsi-SSTK_L80_WAA_A' with (4) drives
 ------------------------
 Identifying DriveIndex 0
 ------------------------
-- Loading volume G05004TA from slot 4 into drive 0
+- Loading volume G05028TA from slot 28 into drive 0
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05004TA is loaded in /dev/tape/by-id/scsi-350223344ab005100-nst
+ - ONLINE: Tape G05028TA is loaded in /dev/tape/by-id/scsi-350223344ab005100-nst
   - This is Bacula 'DriveIndex = 0'
    - Unloading drive 0
     - Unload successful
 ------------------------
 Identifying DriveIndex 1
 ------------------------
-- Loading volume G05004TA from slot 4 into drive 1
+- Loading volume G05003TA from slot 3 into drive 1
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05004TA is loaded in /dev/tape/by-id/scsi-350223344ab005200-nst
+ - ONLINE: Tape G05003TA is loaded in /dev/tape/by-id/scsi-350223344ab005200-nst
   - This is Bacula 'DriveIndex = 1'
    - Unloading drive 1
     - Unload successful
 ------------------------
 Identifying DriveIndex 2
 ------------------------
-- Loading volume G05021TA from slot 21 into drive 2
+- Loading volume G05003TA from slot 3 into drive 2
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05021TA is loaded in /dev/tape/by-id/scsi-350223344ab005300-nst
+ - ONLINE: Tape G05003TA is loaded in /dev/tape/by-id/scsi-350223344ab005300-nst
   - This is Bacula 'DriveIndex = 2'
    - Unloading drive 2
     - Unload successful
 ------------------------
 Identifying DriveIndex 3
 ------------------------
-- Loading volume G05033TA from slot 33 into drive 3
+- Loading volume G05015TA from slot 15 into drive 3
  - Loaded OK
   - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05033TA is loaded in /dev/tape/by-id/scsi-350223344ab005400-nst
+ - ONLINE: Tape G05015TA is loaded in /dev/tape/by-id/scsi-350223344ab005400-nst
   - This is Bacula 'DriveIndex = 3'
    - Unloading drive 3
     - Unload successful
@@ -235,11 +219,11 @@ Library: scsi-SSTK_L80_WAA_A
 
 
 ================================================================================================================
-DONE: Script output and Bacula resource configuration files in: /tmp/bacula-resource-auto-creator_20240215162623
+DONE: Script output and Bacula resource configuration files in: /tmp/bacula-resource-auto-creator_20240219183050
 NOTE: Before use, you *MUST* edit the following Director Storage resource files:
       * DirectorStorage_Autochanger_SSTK_L80_XYZZY_B.cfg
       * DirectorStorage_Autochanger_SSTK_L80_WAA_A.cfg
 ================================================================================================================
-Bacula Resource Auto Creator - v0.11 - bacula-resource-auto-creator.py
-By: Bill Arlofski waa@revpol.com (c) February 14, 2024
+Bacula Resource Auto Creator - v0.14 - bacula-resource-auto-creator.py
+By: Bill Arlofski waa@revpol.com (c) February 18, 2024
 
