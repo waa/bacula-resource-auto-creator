@@ -619,7 +619,6 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
     res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
-    # dev_str = ' Device = '
     dev = 0
     autochanger_dev_str = ''
     while dev < len(lib_dict[lib]):
@@ -658,9 +657,5 @@ for lib in lib_dict:
 # ----------------------------------------------------
 log('\n' + '='*112)
 log('DONE: Script output and Bacula resource configuration files in: ' + work_dir)
-# log('NOTE: Before use, you *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ':')
-# for lib in lib_dict:
-#     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
-#     log('      * DirectorStorage_' + autochanger_name + '.cfg')
 log('='*112)
 log(prog_info_txt)
