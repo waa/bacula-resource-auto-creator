@@ -60,8 +60,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.14'
-reldate = 'February 18, 2024'
+version = '0.15'
+reldate = 'February 27, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -88,7 +88,7 @@ offline = False
 # If testing with mhVTL, skip the scsi-SSTK_L700_XYZZY_A library because it has LTO8/9
 # tapes and LTO8/9 drives. An error is thrown if an LTOx tape is loaded into LTOy drive
 # -------------------------------------------------------------------------------------
-libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'otherLibToSkip']
+libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'scsi-SSTK_L700_XYZZY_A-changer', 'otherLibToSkip']
 
 # ==================================================
 # Nothing below this line should need to be modified
@@ -400,11 +400,9 @@ result = get_shell_result(cmd)
 chk_cmd_result(result, cmd)
 if result.stdout.rstrip('\n') == '1':
     log(' - Found the lin_tape kernel driver loaded')
-    # lin_tape = True
     byid_node_dir_str = '/dev/lin_tape/by-id'
 else:
     log(' - Did not find the lin_tape kernel driver loaded')
-    # lin_tape = False
     byid_node_dir_str = '/dev/tape/by-id'
 
 # Create the byid_txt from all symlinks in /dev/(tape|lin_tape)/by-id directory
@@ -434,8 +432,8 @@ num_libs = len(libs_sg_lst)
 log(' - Found ' + str(num_libs) + ' librar' + ('ies' if num_libs == 0 or num_libs > 1 else 'y'))
 log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_sg_lst)))
 
-# From the libraries' sg nodes, get the corresponding by-id node
-# --------------------------------------------------------------
+# Get the corresponding by-id node from the libraries' sg nodes
+# -------------------------------------------------------------
 if num_libs != 0:
     libs_byid_nodes_lst = []
     log('- Determining libraries\' by-id nodes from their sg nodes')
@@ -454,7 +452,7 @@ for tuple in re.findall('.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
 
 # If 'offline' is True send the offline command to all drives first
 # -----------------------------------------------------------------
-hdr = '\nChecking if we send \'offline\' command to all drives in the Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
+hdr = '\nChecking if we send the \'offline\' command to all drives in the Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 if  offline:
     # First send each drive the offline command
@@ -504,7 +502,7 @@ for lib in libs_byid_nodes_lst:
     hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     if lib in libs_to_skip:
-        log('- Skipping library: ' + lib + '\n')
+        log('- \'' + lib + '\' is in libs_to_skip, skipping...\n')
         continue
     else:
         drive_index = 0
@@ -536,9 +534,10 @@ for lib in libs_byid_nodes_lst:
                     log('  - This is Bacula \'DriveIndex = ' + str(drive_index) + '\'')
                     # We found the drive with the tape loaded in it so
                     # add the current lib, drive_index, drive by-id node,
-                    # st# and sdg# to the lib_dict dictionary, and remove
-                    # the by-id node from the drive_byid_st_sg_lst list
-                    #  --------------------------------------------------
+                    # st# and sg# to the lib_dict dictionary, and remove
+                    # the drive_by-id_node from the drive_byid_st_sg_lst
+                    # list
+                    # ---------------------------------------------------
                     if lib in lib_dict:
                         lib_dict[lib].append((drive_index, drive_byid_node[0], drive_byid_node[1], drive_byid_node[2]))
                     else:
@@ -624,9 +623,9 @@ for lib in lib_dict:
             if index_byid_st_sg_tuple[0] == dev:
                 archive_device = index_byid_st_sg_tuple[1]
                 control_device = index_byid_st_sg_tuple[3]
+                drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
+                drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
                 continue
-        drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
-        drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
         # Open and write Storage Device resource config file
         # --------------------------------------------------
         drv_res_file = work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg'
