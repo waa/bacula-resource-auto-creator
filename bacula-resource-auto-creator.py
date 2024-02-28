@@ -60,7 +60,7 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.15'
+version = '0.16'
 reldate = 'February 27, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
@@ -265,7 +265,7 @@ def get_ip_address(address):
 
 def get_sd_addr():
     'Request the FQDN, Hostname, or IP address, then verify it is an IP address or is resolvable.'
-    i = input('- Please enter the FQDN (preferred), Hostname, or IP address that the Director & Clients will use to contact this SD: ').strip()
+    i = input('\n- Please enter the FQDN (preferred), Hostname, or IP address that the Director & Clients will use to contact this SD: ').strip()
     sd_addr = get_ip_address(i)
     if not sd_addr:
         print('  - The Hostname or FQDN \'' + i + '\' does not resolve to an IP address')
@@ -309,11 +309,7 @@ director_storage_tpl = """Storage {
   MediaType =
   Address =
   Password =
-  SdPort = 9103
-
-  # MaximumConcurrentJobs is automatically set to the number of drive devices in the SD's
-  # Autochanger. It may need to be increased if changes are made to the drive device(s)
-  # -------------------------------------------------------------------------------------
+  SdPort = "9103"
   MaximumConcurrentJobs =
 }
 """
@@ -331,21 +327,18 @@ storage_device_tpl = """Device {
   Name =
   Description =
   DriveIndex =
-  DeviceType = Tape
+  DeviceType = "Tape"
   MediaType =
-  Autochanger = yes
-  AlwaysOpen = yes
-  AutomaticMount = yes
-  LabelMedia = no
-  RandomAccess = no
-  RemovableMedia = yes
+  Autochanger = "yes"
+  AlwaysOpen = "yes"
+  AutomaticMount = "yes"
+  LabelMedia = "no"
+  RandomAccess = "no"
+  RemovableMedia = "yes"
   ControlDevice =
   AlertCommand = "/opt/bacula/scripts/tapealert %l"
   ArchiveDevice =
-
-  # MaximumConcurrentJobs here, and in the Director's Storage resource should probably be increased
-  # -----------------------------------------------------------------------------------------------
-  MaximumConcurrentJobs = 1
+  MaximumConcurrentJobs =
 }
 """
 
@@ -372,15 +365,15 @@ ready = get_ready_str()
 sd_addr = False
 while not sd_addr:
     sd_addr = get_sd_addr()
-print('  - Will use \'Address = "' + sd_addr + '"\' in the Director Storage resource to contact this SD')
+log('  - Will use \'Address = "' + sd_addr + '"\' in the Director Storage resource to contact this SD')
 
 # Ask for the password neded to contact this SD from the Director
 # ---------------------------------------------------------------
 sd_pass = False
 while not sd_pass:
-    sd_pass = input('- Please enter the password the Director will use to contact this SD: ').strip()
+    sd_pass = input('\n- Please enter the password the Director will use to contact this SD: ').strip()
     if len(sd_pass) == 0:
-        print('  - Password cannot be an empty string')
+        print(' - Password cannot be an empty string')
         sd_pass = False
         continue
     else:
@@ -388,7 +381,18 @@ while not sd_pass:
         if sd_pass_ok not in ('Y', 'y'):
             sd_pass = False
         else:
-            print('  - Will use \'Password = "' + sd_pass + '"\' in the Director Storage resource to contact this SD')
+            log('  - Will use \'Password = "' + sd_pass + '"\' in the Director Storage resource to contact this SD')
+
+# Ask for the MaximumConcurrentJobs setting per drive
+# ---------------------------------------------------
+drive_mcj = 0
+while drive_mcj == 0:
+    drive_mcj = input('\n- Please enter the number of concurrent jobs per tape drive: ').strip()
+    if not drive_mcj.isdigit():
+        drive_mcj = 0
+        continue
+    else:
+        log(' - Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\'')
 
 # Check for lin_tape driver
 # -------------------------
@@ -444,11 +448,23 @@ if num_libs != 0:
 # Get each drive's by-id node, nst# node, and sg# node and create
 # the drive_byid_st_sg_lst [('drive_byid_node', 'st#', 'sg#'),...]
 # ----------------------------------------------------------------
-log('- Generating the tape drive list [("drive_byid_node", "st#", "sg#"),...]')
+log('- Generating the tape drive list [(\'drive_byid_node\', \'st node\', \'sg node\'),...]')
+drive_byid_lst = []
 drive_byid_st_sg_lst = []
 for tuple in re.findall('.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
-    sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\d+)', result.stdout)
-    drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
+    # TODO: Come up with a REAL fix. For some reason, OL9 creates
+    # additional symlink nodes in the /dev/tape-/by-id directory tree
+    # ---------------------------------------------------------------
+    # 20240227 - Just hide some extra drive nodes for demo
+    # ----------------------------------------------------
+    if 'WAA' not in tuple[0] and 'XYZZY' not in tuple[0]:
+        sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\d+)', result.stdout)
+        drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
+for tuple in drive_byid_st_sg_lst:
+    drive_byid_lst.append(tuple[0])
+log(' - Found ' + str(len(drive_byid_lst)) + ' drive' + ('s' if len(drive_byid_lst) > 1 else ''))
+log('  - Drive by-id nodes: ' + str(', '.join(drive_byid_lst)))
+log('- Startup complete')
 
 # If 'offline' is True send the offline command to all drives first
 # -----------------------------------------------------------------
@@ -588,9 +604,7 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
     res_txt = res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
-    # TODO: waa - 20240217 - Prompt for the MaximumConcurrentJobs each drive device in Autochangers should use (default = 1)
-    # ----------------------------------------------------------------------------------------------------------------------
-    res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = ' + str(len(lib_dict[lib])))
+    res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * int(drive_mcj)) + '"')
     res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
     # Open and write Director Storage resource config file
     # ----------------------------------------------------
@@ -605,7 +619,7 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
     res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
-    dev_str = ' Device = '
+    # dev_str = ' Device = '
     dev = 0
     autochanger_dev_str = ''
     while dev < len(lib_dict[lib]):
@@ -617,15 +631,16 @@ for lib in lib_dict:
         drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Drive ' + str(dev) \
                     + ' in ' + autochanger_name + ' - ' +created_by_str + '"')
-        drv_res_txt = drv_res_txt.replace('DriveIndex =', 'DriveIndex = ' + str(dev))
+        drv_res_txt = drv_res_txt.replace('DriveIndex =', 'DriveIndex = "' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
+        drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + drive_mcj + '"')
         for index_byid_st_sg_tuple in lib_dict[lib]:
             if index_byid_st_sg_tuple[0] == dev:
                 archive_device = index_byid_st_sg_tuple[1]
                 control_device = index_byid_st_sg_tuple[3]
-                drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
-                drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
                 continue
+        drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
+        drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
         # Open and write Storage Device resource config file
         # --------------------------------------------------
         drv_res_file = work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg'
@@ -637,15 +652,15 @@ for lib in lib_dict:
     # ----------------------------------------------
     res_file = work_dir + '/StorageAutochanger_' + autochanger_name + '.cfg'
     write_res_file(res_file, res_txt)
-    log(' - Storage Autochanger And Drive Device Resources Done\n')
+    log(' - Storage Autochanger And Device Resources Done\n')
 
 # Print location of log file and resource config files
 # ----------------------------------------------------
 log('\n' + '='*112)
 log('DONE: Script output and Bacula resource configuration files in: ' + work_dir)
-log('NOTE: Before use, you *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ':')
-for lib in lib_dict:
-    autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
-    log('      * DirectorStorage_' + autochanger_name + '.cfg')
+# log('NOTE: Before use, you *MUST* edit the following Director Storage resource file' + ('s' if len(lib_dict) > 1 else '') + ':')
+# for lib in lib_dict:
+#     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
+#     log('      * DirectorStorage_' + autochanger_name + '.cfg')
 log('='*112)
 log(prog_info_txt)
