@@ -53,6 +53,7 @@ import sys
 import socket
 import subprocess
 from time import sleep
+from docopt import docopt
 from random import randint
 from datetime import datetime
 from ipaddress import ip_address, IPv4Address
@@ -60,8 +61,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.16'
-reldate = 'February 27, 2024'
+version = '0.17'
+reldate = 'February 28, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -90,6 +91,26 @@ offline = False
 # -------------------------------------------------------------------------------------
 libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'scsi-SSTK_L700_XYZZY_A-changer', 'otherLibToSkip']
 
+# Define the docopt string
+# ------------------------
+doc_opt_str = """
+Usage:
+    bacula-resource-auto-creator.py [-a <addr>] [-p <pass>] [-m <mcj>] [bweb]
+    bacula-resource-auto-creator.py -h | --help
+    bacula-resource-auto-creator.py -v | --version
+
+Options:
+-a, --address <addr>   The FQDN (preferred), hostname, or IP address the Director will use to connect to this SD.
+-p, --password <pass>  The password the Director will use to connect to this SD.
+-m, --mcj <mcj>        The MaximumConcurrentJobs per SD Drive Device. [default: 1]
+
+bweb                   Do we create Director Storage resource configuration files for each SD Drive? [default: False]
+
+-h, --help             Print this help message
+-v, --version          Print the script name and version
+
+"""
+
 # ==================================================
 # Nothing below this line should need to be modified
 # ==================================================
@@ -102,7 +123,7 @@ def now():
 
 def usage():
     'Show the instructions and script information.'
-    # print(doc_opt_str)
+    print(doc_opt_str)
     print(prog_info_txt)
     sys.exit(1)
 
@@ -123,6 +144,16 @@ def log_cmd_results(result):
     log('returncode: ' + str(result.returncode))
     log('stdout: ' + ('\n[begin stdout]\n' + stdout + '\n[end stdout]' if '\n' in stdout else stdout))
     log('stderr: ' + ('\n[begin stderr]\n' + stderr + '\n[end stderr]' if '\n' in stderr else stderr))
+
+def print_opt_errors(opt):
+    'Print the incorrect variable and the reason it is incorrect.'
+    if opt == 'address':
+        error_txt = 'The address specified \'' + args['--address'] + '\' is not an IP address, or it does not resolve to one.'
+    elif opt == 'password':
+        error_txt = 'The password cannot be an empty string.'
+    elif opt == 'mcj':
+        error_txt = 'The mcj \'' + args['--mcj'] + '\' does not appear to be a number.'
+    return '\n' + error_txt + '\n'
 
 def chk_cmd_result(result, cmd):
     'Given a result object, check the returncode, then log and exit if non zero.'
@@ -248,35 +279,42 @@ def resolve(address):
     except Exception:
         return False
 
-def get_ip_address(address):
+def get_ip_address(address, prnt = True):
     'Given an address string, check if it is an IP, if not try to resolve it, and return an IP address'
     if is_ip_address(address):
-        print(' - \'' + address + '\' is an IP address')
+        if prnt:
+            log(' - \'' + address + '\' is an IP address')
         return address
     else:
-        print(' - \'' + address + '\' is not an IP address. Attempting to resolve...')
+        if prnt:
+            log(' - \'' + address + '\' is not an IP address. Attempting to resolve...')
         ip = resolve(address)
         if ip == False:
-            print('  - Oops, cannot resolve FQDN/host \'' + address + '\'')
+            if prnt:
+                log('  - Oops, cannot resolve FQDN/host \'' + address + '\'')
             return False
         else:
-            print('  - FQDN/host \'' + address + '\' resolves to IP address: ' + ip)
+            if prnt:
+                log('  - FQDN/host \'' + address + '\' resolves to IP address: ' + ip)
             return address
 
 def get_sd_addr():
     'Request the FQDN, Hostname, or IP address, then verify it is an IP address or is resolvable.'
     i = input('\n- Please enter the FQDN (preferred), Hostname, or IP address that the Director & Clients will use to contact this SD: ').strip()
-    sd_addr = get_ip_address(i)
-    if not sd_addr:
+    addr = get_ip_address(i)
+    if not addr:
         print('  - The Hostname or FQDN \'' + i + '\' does not resolve to an IP address')
         print('  - Please try again')
         return False
     else:
-        return sd_addr
+        return addr
 
 # ================
 # BEGIN THE SCRIPT
 # ================
+# Assign docopt doc string variable
+# ---------------------------------
+args = docopt(doc_opt_str, version='\n' + progname + ' - v' + version + '\n' + reldate + '\n')
 
 # Set the log directory and file name. This directory will also
 # be where we write the cut-n-paste Bacula resource configurations
@@ -286,13 +324,49 @@ lower_name_and_time = progname.replace(' ', '-').lower() + '_' + date_stamp
 work_dir = '/tmp/' + lower_name_and_time
 log_file = work_dir + '/' + lower_name_and_time + '.log'
 
-# Create the lib_dict dictionary. It will hold {'libraryName': (index, 'drive_byid_node', 'st#', 'sg#'),...}
-# ----------------------------------------------------------------------------------------------------------
-lib_dict = {}
-
 # Create the work_dir directory
 # -----------------------------
 os.mkdir(work_dir)
+
+# Assign / test variables from args set
+# -------------------------------------
+# bweb
+# ----
+bweb = args['bweb']
+
+# Address
+# -------
+if args['--address'] != None:
+    if get_ip_address(args['--address'], False):
+        sd_addr = args['--address']
+    else:
+        log(print_opt_errors('address'))
+        usage()
+else:
+    sd_addr = args['--address']
+
+# Password
+# --------
+if args['--password'] != None:
+    if len(args['--password']) > 0:
+        sd_pass = args['--password']
+    else:
+        log(print_opt_errors('password'))
+        usage()
+else:
+    sd_pass = args['--password']
+
+# mcj
+# ---
+if args['--mcj'].isdigit():
+    drive_mcj = int(args['--mcj'])
+else:
+    log(print_opt_errors('mcj'))
+    usage()
+
+# Create the lib_dict dictionary. It will hold {'libraryName': (index, 'drive_byid_node', 'st#', 'sg#'),...}
+# ----------------------------------------------------------------------------------------------------------
+lib_dict = {}
 
 # Create the string added to Resource config files 'Description =' line
 # ---------------------------------------------------------------------
@@ -362,37 +436,47 @@ ready = get_ready_str()
 # and verify that the Hostname or FQDN resolves to an IP
 # address before using it in the Director's Storage resource
 # ----------------------------------------------------------
-sd_addr = False
-while not sd_addr:
-    sd_addr = get_sd_addr()
-log('  - Will use \'Address = "' + sd_addr + '"\' in the Director Storage resource to contact this SD')
+if sd_addr == None:
+    sd_addr = False
+    while not sd_addr:
+        sd_addr = get_sd_addr()
+    log('  - Will use \'Address = "' + sd_addr + '"\' in the Director Storage resource to contact this SD')
+else:
+    log('- Will use \'Address = "' + sd_addr + '"\' (from command line) in the Director Storage resource to contact this SD')
 
 # Ask for the password neded to contact this SD from the Director
 # ---------------------------------------------------------------
-sd_pass = False
-while not sd_pass:
-    sd_pass = input('\n- Please enter the password the Director will use to contact this SD: ').strip()
-    if len(sd_pass) == 0:
-        print(' - Password cannot be an empty string')
-        sd_pass = False
-        continue
-    else:
-        sd_pass_ok = input(' - Is the password \'' + sd_pass + '\' OK to use? [Y/n]: ').strip() or 'Y'
-        if sd_pass_ok not in ('Y', 'y'):
+if sd_pass == None:
+    sd_pass = False
+    while not sd_pass:
+        sd_pass = input('\n- Please enter the password the Director will use to contact this SD: ').strip()
+        if len(sd_pass) == 0:
+            print(' - Password cannot be an empty string')
             sd_pass = False
+            continue
         else:
-            log('  - Will use \'Password = "' + sd_pass + '"\' in the Director Storage resource to contact this SD')
+            sd_pass_ok = input(' - Is the password \'' + sd_pass + '\' OK to use? [Y/n]: ').strip() or 'Y'
+            if sd_pass_ok not in ('Y', 'y'):
+                sd_pass = False
+            else:
+                log('  - Will use \'Password = "' + sd_pass + '"\' in the Director Storage resource to contact this SD')
+else:
+    log('- Will use \'Password = "' + sd_pass + '"\' (from command line) in the Director Storage resource to contact this SD')
 
-# Ask for the MaximumConcurrentJobs setting per drive
-# ---------------------------------------------------
-drive_mcj = 0
-while drive_mcj == 0:
-    drive_mcj = input('\n- Please enter the number of concurrent jobs per tape drive: ').strip()
-    if not drive_mcj.isdigit():
-        drive_mcj = 0
-        continue
-    else:
-        log(' - Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\'')
+# Now using docopt, with a default of '1' set for the
+# drive_mcj, so just log the variable and where it came from
+# ----------------------------------------------------------
+if any(x in sys.argv for x in ('-m', '--mcj')):
+    log('- Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\' (from command line)')
+else:
+    log('- Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\' (default)')
+
+# Just log the setting of the 'bweb' variable
+# -------------------------------------------
+if bweb:
+    log('- The \'bweb\' variable is True. Will create individual Director Storage resource configuration files for each drive')
+else:
+    log('- The \'bweb\' variable is False. Will not create individual Director Storage resource configuration files for each drive')
 
 # Check for lin_tape driver
 # -------------------------
@@ -455,9 +539,9 @@ for tuple in re.findall('.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
     # TODO: Come up with a REAL fix. For some reason, OL9 creates
     # additional symlink nodes in the /dev/tape-/by-id directory tree
     # ---------------------------------------------------------------
-    # 20240227 - Just hide some extra drive nodes for demo
-    # ----------------------------------------------------
-    if 'WAA' not in tuple[0] and 'XYZZY' not in tuple[0]:
+    # 20240227 - Just hide some extra drive nodes for demo. This should not hurt anything to leave
+    # --------------------------------------------------------------------------------------------
+    if not any(x in tuple[0] for x in ('WAA', 'XYZZY')):
         sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\d+)', result.stdout)
         drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
 for tuple in drive_byid_st_sg_lst:
@@ -593,10 +677,10 @@ for lib in lib_dict:
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
 
-    # Director Storage
-    # ----------------
+    # Director Storage -> SD Autochanger
+    # ----------------------------------
     res_txt = director_storage_tpl
-    log('- Generating Director Storage Resource')
+    log('- Generating Director Storage Resource for Autochanger: ' + autochanger_name)
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "Autochanger with (' \
             + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
@@ -604,13 +688,38 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
     res_txt = res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
-    res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * int(drive_mcj)) + '"')
+    res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * drive_mcj) + '"')
     res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
     # Open and write Director Storage resource config file
     # ----------------------------------------------------
     res_file = work_dir + '/DirectorStorage_' + autochanger_name + '.cfg'
     write_res_file(res_file, res_txt)
     log(' - Done')
+
+    if bweb:
+        # Director Storage -> SD Device(s) - This is primarily for BWeb
+        # -------------------------------------------------------------
+        log(' - The \'bweb\' variable is True, generating Director Storage Resource configuration files for each drive')
+        dev = 0
+        while dev < len(lib_dict[lib]):
+            # Create a Director Storage resource config file for each drive device in the Autochanger
+            # ---------------------------------------------------------------------------------------
+            drv_res_txt = director_storage_tpl
+            log('  - Generating Director Storage Resource for SD Drive Device: ' + autochanger_name + '_Dev' + str(dev))
+            drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
+            drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Stand-Alone Drive Device ' + str(dev) + ' - ' + created_by_str + '"')
+            drv_res_txt = drv_res_txt.replace('Address =', 'Address = "' + sd_addr + '"')
+            drv_res_txt = drv_res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
+            drv_res_txt = drv_res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
+            drv_res_txt = drv_res_txt.replace('Device =', 'Device = "' + autochanger_name + '_Dev' + str(dev) + '"')
+            drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(drive_mcj) + '"')
+            drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
+            # Open and write Director Storage resource config file
+            # ----------------------------------------------------
+            drv_res_file = work_dir + '/DirectorStorage_' + autochanger_name + '_Dev' + str(dev) + '.cfg'
+            write_res_file(drv_res_file, drv_res_txt)
+            dev += 1
+            log('   - Done')
 
     # Storage Autochanger
     # -------------------
@@ -632,7 +741,7 @@ for lib in lib_dict:
                     + ' in ' + autochanger_name + ' - ' +created_by_str + '"')
         drv_res_txt = drv_res_txt.replace('DriveIndex =', 'DriveIndex = "' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-        drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + drive_mcj + '"')
+        drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(drive_mcj) + '"')
         for index_byid_st_sg_tuple in lib_dict[lib]:
             if index_byid_st_sg_tuple[0] == dev:
                 archive_device = index_byid_st_sg_tuple[1]
