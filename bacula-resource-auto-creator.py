@@ -509,7 +509,6 @@ if debug:
     log('lsscsi command: ' + cmd)
 result = get_shell_result(cmd)
 chk_cmd_result(result, cmd)
-result = get_shell_result(cmd)
 lsscsi_txt = result.stdout.rstrip('\n')
 
 # Get the list of tape libraries' sg nodes
@@ -533,7 +532,6 @@ if num_libs != 0:
 # the drive_byid_st_sg_lst [('drive_byid_node', 'st#', 'sg#'),...]
 # ----------------------------------------------------------------
 log('- Generating the tape drive list [(\'drive_byid_node\', \'st node\', \'sg node\'),...]')
-drive_byid_lst = []
 drive_byid_st_sg_lst = []
 for tuple in re.findall('.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
     # TODO: Come up with a REAL fix. For some reason, OL9 creates
@@ -542,12 +540,10 @@ for tuple in re.findall('.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
     # 20240227 - Just hide some extra drive nodes for demo. This should not hurt anything to leave
     # --------------------------------------------------------------------------------------------
     if not any(x in tuple[0] for x in ('WAA', 'XYZZY')):
-        sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\d+)', result.stdout)
+        sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\d+)', lsscsi_txt)
         drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
-for tuple in drive_byid_st_sg_lst:
-    drive_byid_lst.append(tuple[0])
-log(' - Found ' + str(len(drive_byid_lst)) + ' drive' + ('s' if len(drive_byid_lst) > 1 else ''))
-log('  - Drive by-id nodes: ' + str(', '.join(drive_byid_lst)))
+log(' - Found ' + str(len(drive_byid_st_sg_lst)) + ' drive' + ('s' if len(drive_byid_st_sg_lst) > 1 else ''))
+log('  - Drive by-id nodes: ' + str(', '.join([r[0] for r in drive_byid_st_sg_lst])))
 log('- Startup complete')
 
 # If 'offline' is True send the offline command to all drives first
