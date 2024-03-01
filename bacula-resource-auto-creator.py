@@ -61,23 +61,13 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.17'
-reldate = 'February 28, 2024'
+version = '0.18'
+reldate = 'February 29, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
 prog_info_txt = progname + ' - v' + version + ' - ' + scriptname \
               + '\nBy: ' + progauthor + ' ' + authoremail + ' (c) ' + reldate + '\n'
-
-# Should all debugging information be logged?
-# (ie: mtx, mt outputs, and reporting of all actions)
-# ---------------------------------------------------
-debug = False
-
-# How long to sleep between mt and mtx
-# commands. This should typically not be zero
-# -------------------------------------------
-sleep_secs = 10
 
 # Do the tape drive(s) require that we issue
 # the mt offline before unloading a drive?
@@ -95,19 +85,22 @@ libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'scsi-SSTK_L700_XYZZY_A-changer', 'oth
 # ------------------------
 doc_opt_str = """
 Usage:
-    bacula-resource-auto-creator.py [-a <addr>] [-p <pass>] [-m <mcj>] [bweb]
-    bacula-resource-auto-creator.py -h | --help
-    bacula-resource-auto-creator.py -v | --version
+  bacula-resource-auto-creator.py [-a <addr>] [-p <pass>] [-m <mcj>] [-s <secs>] [bweb] [debug] [offline]
+  bacula-resource-auto-creator.py -h | --help
+  bacula-resource-auto-creator.py -v | --version
 
 Options:
--a, --address <addr>   The FQDN (preferred), hostname, or IP address the Director will use to connect to this SD.
--p, --password <pass>  The password the Director will use to connect to this SD.
--m, --mcj <mcj>        The MaximumConcurrentJobs per SD Drive Device. [default: 1]
+-a, --address <addr>     The FQDN (preferred), hostname, or IP address the Director will use to connect to this SD.
+-p, --password <pass>    The password the Director will use to connect to this SD.
+-m, --mcj <mcj>          The MaximumConcurrentJobs per SD Drive Device. [default: 1]
+-s, --sleep_secs <secs>  The number of seconds to sleep between mtx and mt commands. [default: 15]
 
-bweb                   Do we create Director Storage resource configuration files for each SD Drive? [default: False]
+bweb                     Do we create Director Storage resource configuration files for each SD Drive? [default: False]
+debug                    Enables logging of additional information such as the full 'mt', 'mtx', 'ls', and 'lsscsi' outputs. [default: False]
+offline                  Do the drives require to be sent the 'offline' command before unload? [default: False]
 
--h, --help             Print this help message
--v, --version          Print the script name and version
+-h, --help               Print this help message.
+-v, --version            Print the script name and version.
 
 """
 
@@ -152,7 +145,9 @@ def print_opt_errors(opt):
     elif opt == 'password':
         error_txt = 'The password cannot be an empty string.'
     elif opt == 'mcj':
-        error_txt = 'The mcj \'' + args['--mcj'] + '\' does not appear to be a number.'
+        error_txt = 'The mcj variable \'' + args['--mcj'] + '\' does not appear to be a number.'
+    elif opt == 'sleep':
+        error_txt = 'The sleep seconds \'' + args['--mcj'] + '\' does not appear to be a number.'
     return '\n' + error_txt + '\n'
 
 def chk_cmd_result(result, cmd):
@@ -330,9 +325,17 @@ os.mkdir(work_dir)
 
 # Assign / test variables from args set
 # -------------------------------------
+# debug
+# -----
+debug = args['debug']
+
 # bweb
 # ----
 bweb = args['bweb']
+
+# offline
+# -------
+offline = args['offline']
 
 # Address
 # -------
@@ -362,6 +365,14 @@ if args['--mcj'].isdigit():
     drive_mcj = int(args['--mcj'])
 else:
     log(print_opt_errors('mcj'))
+    usage()
+
+# sleep_secs
+# ----------
+if args['--sleep_secs'].isdigit():
+    sleep_secs = int(args['--sleep_secs'])
+else:
+    log(print_opt_errors('sleep'))
     usage()
 
 # Create the lib_dict dictionary. It will hold {'libraryName': (index, 'drive_byid_node', 'st#', 'sg#'),...}
@@ -423,14 +434,32 @@ log('\n\n' + '='*10 + hdr + '='*10)
 log('- Work directory: ' + work_dir)
 log('- Logging to file: ' + lower_name_and_time + '.log')
 
-# Get the OS's uname to be used in other tests
+# Just log the setting of the 'debug' variable
 # --------------------------------------------
-uname = get_uname()
+log('- The \'debug\' variable is ' + str(debug) + ', additional information will ' \
+     + ('' if debug else 'not ') + 'be logged')
 
-# Check the OS to assign the 'ready' variable
-# to know when a drive is loaded and ready.
+# Just log the setting of the 'bweb' variable
 # -------------------------------------------
-ready = get_ready_str()
+log('- The \'bweb\' variable is ' + str(bweb) + '. Will ' + ('' if bweb else 'not ') \
+     + 'create individual Director Storage resource configuration files for each drive')
+
+# Just log the setting of the 'offline' variable
+# ----------------------------------------------
+log('- The \'offline\' variable is ' + str(offline) + '. Will ' + ('' if offline else 'not ') \
+     + 'send each drive the \'offline\' command before attempting to unload')
+
+# Now using docopt, with a default of '1' set for the
+# drive_mcj, so just log the variable and where it came from
+# ----------------------------------------------------------
+log('- Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\' ' \
+     + ('(from command line)' if any(x in sys.argv for x in ('-m', '--mcj')) else '(default)'))
+
+# Now using docopt, with a default of '10' set for the
+# sleep variable, so just log the variable and where it came from
+# ---------------------------------------------------------------
+log('- Sleep time between \'mtx\' and \'mt\' commands is ' + str(sleep_secs) + ' seconds ' \
+     + ('(from command line)' if any(x in sys.argv for x in ('-s', '--sleep')) else '(default)'))
 
 # Ask for the Hostname, FQDN, or IP address of this SD
 # and verify that the Hostname or FQDN resolves to an IP
@@ -463,20 +492,14 @@ if sd_pass == None:
 else:
     log('- Will use \'Password = "' + sd_pass + '"\' (from command line) in the Director Storage resource to contact this SD')
 
-# Now using docopt, with a default of '1' set for the
-# drive_mcj, so just log the variable and where it came from
-# ----------------------------------------------------------
-if any(x in sys.argv for x in ('-m', '--mcj')):
-    log('- Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\' (from command line)')
-else:
-    log('- Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\' (default)')
+# Get the OS's uname to be used in other tests
+# --------------------------------------------
+uname = get_uname()
 
-# Just log the setting of the 'bweb' variable
+# Check the OS to assign the 'ready' variable
+# to know when a drive is loaded and ready.
 # -------------------------------------------
-if bweb:
-    log('- The \'bweb\' variable is True. Will create individual Director Storage resource configuration files for each drive')
-else:
-    log('- The \'bweb\' variable is False. Will not create individual Director Storage resource configuration files for each drive')
+ready = get_ready_str()
 
 # Check for lin_tape driver
 # -------------------------
@@ -686,10 +709,7 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
     res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * drive_mcj) + '"')
     res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-    # Open and write Director Storage resource config file
-    # ----------------------------------------------------
-    res_file = work_dir + '/DirectorStorage_' + autochanger_name + '.cfg'
-    write_res_file(res_file, res_txt)
+    write_res_file(work_dir + '/DirectorStorage_' + autochanger_name + '.cfg', res_txt)
     log(' - Done')
 
     if bweb:
@@ -710,10 +730,7 @@ for lib in lib_dict:
             drv_res_txt = drv_res_txt.replace('Device =', 'Device = "' + autochanger_name + '_Dev' + str(dev) + '"')
             drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(drive_mcj) + '"')
             drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-            # Open and write Director Storage resource config file
-            # ----------------------------------------------------
-            drv_res_file = work_dir + '/DirectorStorage_' + autochanger_name + '_Dev' + str(dev) + '.cfg'
-            write_res_file(drv_res_file, drv_res_txt)
+            write_res_file(work_dir + '/DirectorStorage_' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
             dev += 1
             log('   - Done')
 
@@ -745,22 +762,15 @@ for lib in lib_dict:
                 continue
         drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
         drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
-        # Open and write Storage Device resource config file
-        # --------------------------------------------------
-        drv_res_file = work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg'
-        write_res_file(drv_res_file, drv_res_txt)
+        write_res_file(work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
         dev += 1
         log('  - Done')
     res_txt = res_txt.replace(' Device =', ' Device = ' + autochanger_dev_str)
-    # Open and write Storage Autochanger config file
-    # ----------------------------------------------
-    res_file = work_dir + '/StorageAutochanger_' + autochanger_name + '.cfg'
-    write_res_file(res_file, res_txt)
+    write_res_file(work_dir + '/StorageAutochanger_' + autochanger_name + '.cfg', res_txt)
     log(' - Storage Autochanger And Device Resources Done\n')
 
 # Print location of log file and resource config files
 # ----------------------------------------------------
-log('\n' + '='*112)
-log('DONE: Script output and Bacula resource configuration files in: ' + work_dir)
-log('='*112)
+hdr = '\nDONE: Bacula resource configuration files and script log in: ' + work_dir + '\n'
+log('\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 log(prog_info_txt)
