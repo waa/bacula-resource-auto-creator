@@ -157,8 +157,7 @@ def chk_cmd_result(result, cmd):
             log('  - Device is "busy", probably locked by another process. Please be sure \'bacula-sd\' is not running')
             log('   - Exiting with errorlevel ' + str(result.returncode))
         log_cmd_results(result)
-        log('\n' + '='*75)
-        log(prog_info_txt)
+        log('\n' + '='*(prog_info_txt.find('\n')) + '\n' + prog_info_txt)
         sys.exit(result.returncode)
 
 def get_shell_result(cmd):
@@ -323,18 +322,10 @@ log_file = work_dir + '/' + lower_name_and_time + '.log'
 # -----------------------------
 os.mkdir(work_dir)
 
-# Assign / test variables from args set
-# -------------------------------------
-# debug
-# -----
+# Assign / test variables from args dict
+# --------------------------------------
 debug = args['debug']
-
-# bweb
-# ----
 bweb = args['bweb']
-
-# offline
-# -------
 offline = args['offline']
 
 # Address
@@ -434,30 +425,30 @@ log('\n\n' + '='*10 + hdr + '='*10)
 log('- Work directory: ' + work_dir)
 log('- Logging to file: ' + lower_name_and_time + '.log')
 
-# Just log the setting of the 'debug' variable
-# --------------------------------------------
+# Log the setting of the 'debug' variable
+# ---------------------------------------
 log('- The \'debug\' variable is ' + str(debug) + ', additional information will ' \
      + ('' if debug else 'not ') + 'be logged')
 
-# Just log the setting of the 'bweb' variable
-# -------------------------------------------
+# Log the setting of the 'bweb' variable
+# --------------------------------------
 log('- The \'bweb\' variable is ' + str(bweb) + '. Will ' + ('' if bweb else 'not ') \
      + 'create individual Director Storage resource configuration files for each drive')
 
-# Just log the setting of the 'offline' variable
-# ----------------------------------------------
+# Log the setting of the 'offline' variable
+# -----------------------------------------
 log('- The \'offline\' variable is ' + str(offline) + '. Will ' + ('' if offline else 'not ') \
      + 'send each drive the \'offline\' command before attempting to unload')
 
-# Now using docopt, with a default of '1' set for the
-# drive_mcj, so just log the variable and where it came from
+# Using docopt, with a default of '1' set for the drive_mcj,
+# so just log the variable and where it came from
 # ----------------------------------------------------------
 log('- Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\' ' \
      + ('(from command line)' if any(x in sys.argv for x in ('-m', '--mcj')) else '(default)'))
 
-# Now using docopt, with a default of '10' set for the
-# sleep variable, so just log the variable and where it came from
-# ---------------------------------------------------------------
+# Using docopt, with a default of '10' set for the  sleep_secs
+# variable, so just log the variable and where it came from
+# ------------------------------------------------------------
 log('- Sleep time between \'mtx\' and \'mt\' commands is ' + str(sleep_secs) + ' seconds ' \
      + ('(from command line)' if any(x in sys.argv for x in ('-s', '--sleep')) else '(default)'))
 
@@ -520,7 +511,7 @@ else:
 # -----------------------------------------------------------------------------
 cmd = 'ls -l ' + byid_node_dir_str + ' | grep "^lrw"'
 if debug:
-    log('Command \'' + cmd + '\' output:')
+    log('ls command: ' + cmd)
 result = get_shell_result(cmd)
 chk_cmd_result(result, cmd)
 byid_txt = result.stdout.rstrip('\n')
@@ -573,7 +564,7 @@ log('- Startup complete')
 # -----------------------------------------------------------------
 hdr = '\nChecking if we send the \'offline\' command to all drives in the Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
-if  offline:
+if offline:
     # First send each drive the offline command
     # -----------------------------------------
     log('- The \'offline\' variable is True, sending all drives offline command')
@@ -585,7 +576,7 @@ if  offline:
         result = get_shell_result(cmd)
         chk_cmd_result(result, cmd)
 else:
-    log('- The \'offline\' variable is False, skip sending offline commands')
+    log('- The \'offline\' variable is False, skip sending all drives offline command')
 
 # For each library found, unload each of the drives in it before
 # starting the process of identifying the Bacula DriveIndexes
@@ -723,7 +714,8 @@ for lib in lib_dict:
             drv_res_txt = director_storage_tpl
             log('  - Generating Director Storage Resource for SD Drive Device: ' + autochanger_name + '_Dev' + str(dev))
             drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
-            drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Stand-Alone Drive Device ' + str(dev) + ' - ' + created_by_str + '"')
+            drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Stand-Alone Drive Device ' \
+                        + str(dev) + ' - ' + created_by_str + '"')
             drv_res_txt = drv_res_txt.replace('Address =', 'Address = "' + sd_addr + '"')
             drv_res_txt = drv_res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
             drv_res_txt = drv_res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
