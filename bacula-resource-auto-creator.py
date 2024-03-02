@@ -61,8 +61,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.18'
-reldate = 'February 29, 2024'
+version = '0.19'
+reldate = 'March 01, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -422,6 +422,7 @@ storage_device_tpl = """Device {
 # ----------------------
 hdr = '[ Starting ' + sys.argv[0] + ' v' + version + ' ]'
 log('\n\n' + '='*10 + hdr + '='*10)
+log('- Command line: ' + str(' '.join(sys.argv)))
 log('- Work directory: ' + work_dir)
 log('- Logging to file: ' + lower_name_and_time + '.log')
 
