@@ -61,7 +61,7 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.20'
+version = '0.21'
 reldate = 'May 01, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
@@ -589,17 +589,21 @@ for lib in libs_byid_nodes_lst:
     num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
     hdr = '\n' + lib + ': Unloading (' + str(num_drives) + ') Tape Drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
-    # Unload all the drives in the library
-    # ------------------------------------
-    drive_index = 0
-    while drive_index < num_drives:
-        log('- Checking if a tape is in drive ' + str(drive_index))
-        slot_loaded, vol_loaded = loaded(lib, drive_index)
-        if slot_loaded != '0':
-            log('  - Unloading volume ' + vol_loaded + ' from drive ' + str(drive_index) + ' to slot ' + slot_loaded)
-            unload(lib, slot_loaded, drive_index)
-        drive_index += 1
-    log('')
+    if lib in libs_to_skip:
+        log(lib + ' is in the \'libs_to_skip\' list, skipping...\n')
+        continue
+    else:
+        # Unload all the drives in the library
+        # ------------------------------------
+        drive_index = 0
+        while drive_index < num_drives:
+            log('- Checking if a tape is in drive ' + str(drive_index))
+            slot_loaded, vol_loaded = loaded(lib, drive_index)
+            if slot_loaded != '0':
+                log('  - Unloading volume ' + vol_loaded + ' from drive ' + str(drive_index) + ' to slot ' + slot_loaded)
+                unload(lib, slot_loaded, drive_index)
+            drive_index += 1
+        log('')
 
 # Now, iterate through each Library found, get the number of drives
 # in it, then load a tape into each one, and attempt to identify
