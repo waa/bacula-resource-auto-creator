@@ -613,7 +613,7 @@ for lib in libs_byid_nodes_lst:
     hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     if lib in libs_to_skip:
-        log('- \'' + lib + '\' is in libs_to_skip, skipping...\n')
+        log(lib + ' is in the \'libs_to_skip\' list, skipping...\n')
         continue
     else:
         drive_index = 0
@@ -631,11 +631,11 @@ for lib in libs_byid_nodes_lst:
             else:
                 log(' - Load FAILED')
             chk_cmd_result(result, cmd)
-            log('  - Sleeping ' + str(sleep_secs) + ' seconds to allow drive to settle')
+            log('  - Sleeping ' + str(sleep_secs) + ' second' + ('s' if sleep_secs > 1 else '') + ' to allow drive to settle')
             sleep(sleep_secs)
 
-            # Test by-id device nodes with mt to identify drive's index
-            # ---------------------------------------------------------
+            # Test by-id device nodes with mt to identify drive's Bacula 'DriveIndex' setting
+            # -------------------------------------------------------------------------------
             for drive_byid_node in drive_byid_st_sg_lst:
                 if debug:
                     log('- Checking drive by-id node \'' + byid_node_dir_str + '/' + drive_byid_node[0] + '\'')
@@ -713,7 +713,7 @@ for lib in lib_dict:
             # Create a Director Storage resource config file for each drive device in the Autochanger
             # ---------------------------------------------------------------------------------------
             drv_res_txt = director_storage_tpl
-            log('  - Generating Director Storage Resource for SD Drive Device: ' + autochanger_name + '_Dev' + str(dev))
+            log('  - Generating Director Storage Resource: ' + autochanger_name + '_Dev' + str(dev))
             drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
             drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Stand-Alone Drive Device ' \
                         + str(dev) + ' - ' + created_by_str + '"')
@@ -740,7 +740,7 @@ for lib in lib_dict:
         # Create a Storage Device resource config file for each drive device in the Autochanger
         # -------------------------------------------------------------------------------------
         drv_res_txt = storage_device_tpl
-        log(' - Generating Device Resource: ' + autochanger_name + '_Dev' + str(dev))
+        log(' - Generating Storage Device Resource: ' + autochanger_name + '_Dev' + str(dev))
         autochanger_dev_str += '"' + autochanger_name + '_Dev' + str(dev) + '"' + (', ' if dev <= (len(lib_dict[lib]) - 2) else '')
         drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Drive ' + str(dev) \
