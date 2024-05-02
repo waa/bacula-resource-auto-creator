@@ -61,8 +61,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.19'
-reldate = 'March 01, 2024'
+version = '0.20'
+reldate = 'May 01, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -219,7 +219,7 @@ def loaded(lib, index):
     result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
     drive_loaded_line = re.search('Data Transfer Element ' + str(index) + ':Full.*', result.stdout)
     if drive_loaded_line is not None:
-        slot_and_vol_loaded = (re.sub('^Data Transfer Element.*Element (\d+) Loaded.*= (\w+)', '\\1 \\2', drive_loaded_line.group(0))).split()
+        slot_and_vol_loaded = (re.sub(r'^Data Transfer Element.*Element (\d+) Loaded.*= (\w+)', '\\1 \\2', drive_loaded_line.group(0))).split()
         slot_loaded = slot_and_vol_loaded[0]
         vol_loaded = slot_and_vol_loaded[1]
         log(' - Drive ' \
@@ -233,7 +233,7 @@ def loaded(lib, index):
 
 def get_random_slot(lib):
     'Return a pseudo-random slot that contains a tape and the volume name in the slot.'
-    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status | grep "Storage Element [0-9]\{1,3\}:Full" | grep -v "CLN"')
+    result = lib_or_drv_status(r'mtx -f ' + byid_node_dir_str + '/' + lib + ' status | grep "Storage Element [0-9]\\{1,3\\}:Full" | grep -v "CLN"')
     full_slots_lst = re.findall('Storage Element [0-9].?:Full.* ', result.stdout)
     rand_int = randint(0, len(full_slots_lst) - 1)
     slot = re.sub('Storage Element ([0-9].?):Full.*', '\\1', full_slots_lst[rand_int])
@@ -519,7 +519,7 @@ byid_txt = result.stdout.rstrip('\n')
 
 # Get lsscsi output for use later to determine Library and tape drive sg# nodes
 # -----------------------------------------------------------------------------
-cmd = 'lsscsi -g | grep "tape\|mediumx"'
+cmd = 'lsscsi -g | grep "tape\\|mediumx"'
 if debug:
     log('lsscsi command: ' + cmd)
 result = get_shell_result(cmd)
@@ -529,7 +529,7 @@ lsscsi_txt = result.stdout.rstrip('\n')
 # Get the list of tape libraries' sg nodes
 # ----------------------------------------
 log('- Getting the list of tape libraries\' sg nodes')
-libs_sg_lst = re.findall('.* mediumx .*/(sg\d{1,3})', lsscsi_txt)
+libs_sg_lst = re.findall(r'.* mediumx .*/(sg\d{1,3})', lsscsi_txt)
 num_libs = len(libs_sg_lst)
 log(' - Found ' + str(num_libs) + ' librar' + ('ies' if num_libs == 0 or num_libs > 1 else 'y'))
 log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_sg_lst)))
@@ -548,14 +548,14 @@ if num_libs != 0:
 # ----------------------------------------------------------------
 log('- Generating the tape drive list [(\'drive_byid_node\', \'st node\', \'sg node\'),...]')
 drive_byid_st_sg_lst = []
-for tuple in re.findall('.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
+for tuple in re.findall(r'.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
     # TODO: Come up with a REAL fix. For some reason, OL9 creates
     # additional symlink nodes in the /dev/tape-/by-id directory tree
     # ---------------------------------------------------------------
     # 20240227 - Just hide some extra drive nodes for demo. This should not hurt anything to leave
     # --------------------------------------------------------------------------------------------
     if not any(x in tuple[0] for x in ('WAA', 'XYZZY')):
-        sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\d+)', lsscsi_txt)
+        sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\\d+)', lsscsi_txt)
         drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
 log(' - Found ' + str(len(drive_byid_st_sg_lst)) + ' drive' + ('s' if len(drive_byid_st_sg_lst) > 1 else ''))
 log('  - Drive by-id nodes: ' + str(', '.join([r[0] for r in drive_byid_st_sg_lst])))
