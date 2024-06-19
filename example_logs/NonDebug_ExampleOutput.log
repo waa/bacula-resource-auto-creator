@@ -1,28 +1,30 @@
 
 
-==========[ Starting ./bacula-resource-auto-creator.py v0.18 ]==========
-- Command line: ./bacula-resource-auto-creator.py -a ol9 -p p@55werDz -s 1 -m 5 bweb
-- Work directory: /tmp/bacula-resource-auto-creator_20240301203753
-- Logging to file: bacula-resource-auto-creator_20240301203753.log
+==========[ Starting Bacula Resource Auto Creator v0.22 ]==========
+- Command line: ./bacula-resource-auto-creator.py -a 1.1.1.1 -p 12345 -m 1 -s 0
+- Work directory: /tmp/bacula-resource-auto-creator_20240618211203
+- Logging to file: bacula-resource-auto-creator_20240618211203.log
 - The 'debug' variable is False, additional information will not be logged
-- The 'bweb' variable is True. Will create individual Director Storage resource configuration files for each drive
+- The 'bweb' variable is False. Will not create individual Director Storage resource configuration files for each drive
 - The 'offline' variable is False. Will not send each drive the 'offline' command before attempting to unload
-- Each Drive Device will have 'MaximumConcurrentJobs = "5"' (from command line)
-- Sleep time between 'mtx' and 'mt' commands is 1 seconds (from command line)
-- Will use 'Address = "ol9"' (from command line) in the Director Storage resource to contact this SD
-- Will use 'Password = "p@55werDz"' (from command line) in the Director Storage resource to contact this SD
+- Each Drive Device will have 'MaximumConcurrentJobs = "1"' (from command line)
+- Sleep time between 'mtx' and 'mt' commands is 0 seconds (from command line)
+- Will use 'Address = "1.1.1.1"' (from command line) in the Director Storage resource to contact this SD
+- Will use 'Password = "12345"' (from command line) in the Director Storage resource to contact this SD
 - Getting the OS uname for use in other tests
 - Determining the correct mt "ready" string
 - Checking for lin_tape driver
- - Did not find the lin_tape kernel driver loaded
+  - Did not find the lin_tape kernel driver loaded
+- Getting 'by-id' device nodes
+- Getting 'lsscsi' output
 - Getting the list of tape libraries' sg nodes
  - Found 3 libraries
-  - Library sg nodes: sg12, sg11, sg16
+  - Library sg nodes: sg13, sg14, sg15
 - Determining libraries' by-id nodes from their sg nodes
  - Library by-id nodes: scsi-SSTK_L700_XYZZY_A-changer, scsi-SSTK_L80_XYZZY_B-changer, scsi-SSTK_L80_WAA_A-changer
 - Generating the tape drive list [('drive_byid_node', 'st node', 'sg node'),...]
  - Found 12 drives
-  - Drive by-id nodes: scsi-350223344ab000100-nst, scsi-350223344ab000200-nst, scsi-350223344ab000300-nst, scsi-350223344ab000400-nst, scsi-350223344ab000900-nst, scsi-350223344ab001000-nst, scsi-350223344ab001100-nst, scsi-350223344ab001200-nst, scsi-350223344ab005100-nst, scsi-350223344ab005200-nst, scsi-350223344ab005300-nst, scsi-350223344ab005400-nst
+  - Drive by-id nodes: scsi-350223344ab000100-nst, scsi-350223344ab000200-nst, scsi-350223344ab000300-nst, scsi-350223344ab000400-nst, scsi-350223344ab000900-nst, scsi-350223344ab001000-nst, scsi-350223344ab001100-nst, scsi-350223344ab001200-nst, scsi-350223344ab001700-nst, scsi-350223344ab001800-nst, scsi-350223344ab001900-nst, scsi-350223344ab002000-nst
 - Startup complete
 
 
@@ -32,20 +34,13 @@ Checking if we send the 'offline' command to all drives in the Libraries Found
 - The 'offline' variable is False, skip sending all drives offline command
 
 
-====================================================
-Unloading All Tape Drives In The (3) Libraries Found
-====================================================
+=========================================================
+Unloading All (12) Tape Drives In The (3) Libraries Found
+=========================================================
 ---------------------------------------------------------
 scsi-SSTK_L700_XYZZY_A-changer: Unloading (4) Tape Drives
 ---------------------------------------------------------
-- Checking if a tape is in drive 0
- - Drive 0 is empty
-- Checking if a tape is in drive 1
- - Drive 1 is empty
-- Checking if a tape is in drive 2
- - Drive 2 is empty
-- Checking if a tape is in drive 3
- - Drive 3 is empty
+scsi-SSTK_L700_XYZZY_A-changer is in the 'libs_to_skip' list, skipping...
 
 --------------------------------------------------------
 scsi-SSTK_L80_XYZZY_B-changer: Unloading (4) Tape Drives
@@ -78,7 +73,7 @@ Iterating Through Each Library Found
 --------------------------------------------------------
 Library 'scsi-SSTK_L700_XYZZY_A-changer' with (4) drives
 --------------------------------------------------------
-- 'scsi-SSTK_L700_XYZZY_A-changer' is in libs_to_skip, skipping...
+scsi-SSTK_L700_XYZZY_A-changer is in the 'libs_to_skip' list, skipping...
 
 -------------------------------------------------------
 Library 'scsi-SSTK_L80_XYZZY_B-changer' with (4) drives
@@ -86,40 +81,40 @@ Library 'scsi-SSTK_L80_XYZZY_B-changer' with (4) drives
 ------------------------
 Identifying DriveIndex 0
 ------------------------
-- Loading volume G03030TA from slot 30 into drive 0
+- Loading volume G03009TA from slot 9 into drive 0
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03030TA is loaded in /dev/tape/by-id/scsi-350223344ab000900-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G03009TA is loaded in /dev/tape/by-id/scsi-350223344ab000900-nst
   - This is Bacula 'DriveIndex = 0'
    - Unloading drive 0
     - Unload successful
 ------------------------
 Identifying DriveIndex 1
 ------------------------
-- Loading volume G03021TA from slot 21 into drive 1
+- Loading volume G03029TA from slot 29 into drive 1
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03021TA is loaded in /dev/tape/by-id/scsi-350223344ab001000-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G03029TA is loaded in /dev/tape/by-id/scsi-350223344ab001000-nst
   - This is Bacula 'DriveIndex = 1'
    - Unloading drive 1
     - Unload successful
 ------------------------
 Identifying DriveIndex 2
 ------------------------
-- Loading volume G03025TA from slot 25 into drive 2
+- Loading volume G03011TA from slot 11 into drive 2
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03025TA is loaded in /dev/tape/by-id/scsi-350223344ab001100-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G03011TA is loaded in /dev/tape/by-id/scsi-350223344ab001100-nst
   - This is Bacula 'DriveIndex = 2'
    - Unloading drive 2
     - Unload successful
 ------------------------
 Identifying DriveIndex 3
 ------------------------
-- Loading volume G03016TA from slot 16 into drive 3
+- Loading volume G03036TA from slot 36 into drive 3
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G03016TA is loaded in /dev/tape/by-id/scsi-350223344ab001200-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G03036TA is loaded in /dev/tape/by-id/scsi-350223344ab001200-nst
   - This is Bacula 'DriveIndex = 3'
    - Unloading drive 3
     - Unload successful
@@ -130,40 +125,40 @@ Library 'scsi-SSTK_L80_WAA_A-changer' with (4) drives
 ------------------------
 Identifying DriveIndex 0
 ------------------------
-- Loading volume G05023TA from slot 23 into drive 0
+- Loading volume G05006TA from slot 6 into drive 0
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05023TA is loaded in /dev/tape/by-id/scsi-350223344ab005100-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G05006TA is loaded in /dev/tape/by-id/scsi-350223344ab001700-nst
   - This is Bacula 'DriveIndex = 0'
    - Unloading drive 0
     - Unload successful
 ------------------------
 Identifying DriveIndex 1
 ------------------------
-- Loading volume G05007TA from slot 7 into drive 1
+- Loading volume G05015TA from slot 15 into drive 1
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05007TA is loaded in /dev/tape/by-id/scsi-350223344ab005200-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G05015TA is loaded in /dev/tape/by-id/scsi-350223344ab001800-nst
   - This is Bacula 'DriveIndex = 1'
    - Unloading drive 1
     - Unload successful
 ------------------------
 Identifying DriveIndex 2
 ------------------------
-- Loading volume G05010TA from slot 10 into drive 2
+- Loading volume G05012TA from slot 12 into drive 2
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05010TA is loaded in /dev/tape/by-id/scsi-350223344ab005300-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G05012TA is loaded in /dev/tape/by-id/scsi-350223344ab001900-nst
   - This is Bacula 'DriveIndex = 2'
    - Unloading drive 2
     - Unload successful
 ------------------------
 Identifying DriveIndex 3
 ------------------------
-- Loading volume G05027TA from slot 27 into drive 3
+- Loading volume G05015TA from slot 15 into drive 3
  - Loaded OK
-  - Sleeping 1 seconds to allow drive to settle
- - ONLINE: Tape G05027TA is loaded in /dev/tape/by-id/scsi-350223344ab005400-nst
+  - Sleeping 0 seconds to allow drive to settle
+ - ONLINE: Tape G05015TA is loaded in /dev/tape/by-id/scsi-350223344ab002000-nst
   - This is Bacula 'DriveIndex = 3'
    - Unloading drive 3
     - Unload successful
@@ -173,18 +168,18 @@ Identifying DriveIndex 3
 --------------------------------------
 Library: scsi-SSTK_L80_XYZZY_B-changer
 --------------------------------------
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab000900-nst => DriveIndex = 0
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001000-nst => DriveIndex = 1
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001100-nst => DriveIndex = 2
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001200-nst => DriveIndex = 3
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab000900-nst -> DriveIndex = 0
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001000-nst -> DriveIndex = 1
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001100-nst -> DriveIndex = 2
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001200-nst -> DriveIndex = 3
 
 ------------------------------------
 Library: scsi-SSTK_L80_WAA_A-changer
 ------------------------------------
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab005100-nst => DriveIndex = 0
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab005200-nst => DriveIndex = 1
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab005300-nst => DriveIndex = 2
-ArchiveDevice = /dev/tape/by-id/scsi-350223344ab005400-nst => DriveIndex = 3
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001700-nst -> DriveIndex = 0
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001800-nst -> DriveIndex = 1
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab001900-nst -> DriveIndex = 2
+ArchiveDevice = /dev/tape/by-id/scsi-350223344ab002000-nst -> DriveIndex = 3
 
 ---------------------------------------------------------
 Stand Alone Drives (May be in a library that was skipped)
@@ -193,63 +188,39 @@ scsi-350223344ab000100-nst, scsi-350223344ab000200-nst, scsi-350223344ab000300-n
 ================================================================================
 
 
-=================================================================================
-Generating Bacula Resource Configuration Files For Each Library Found With Drives
-=================================================================================
+=====================================================================
+Generating Bacula Resource Configuration Files For Each Library Found
+=====================================================================
 --------------------------------------
 Library: scsi-SSTK_L80_XYZZY_B-changer
 --------------------------------------
-- Generating Director Storage Resource for Autochanger: Autochanger_SSTK_L80_XYZZY_B-changer
- - Done
- - The 'bweb' variable is True, generating Director Storage Resource configuration files for each drive
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_XYZZY_B-changer_Dev0
-   - Done
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_XYZZY_B-changer_Dev1
-   - Done
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_XYZZY_B-changer_Dev2
-   - Done
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_XYZZY_B-changer_Dev3
-   - Done
-- Generating Storage Autochanger And Device Resources
- - Generating Device Resource: Autochanger_SSTK_L80_XYZZY_B-changer_Dev0
-  - Done
- - Generating Device Resource: Autochanger_SSTK_L80_XYZZY_B-changer_Dev1
-  - Done
- - Generating Device Resource: Autochanger_SSTK_L80_XYZZY_B-changer_Dev2
-  - Done
- - Generating Device Resource: Autochanger_SSTK_L80_XYZZY_B-changer_Dev3
-  - Done
- - Storage Autochanger And Device Resources Done
+- Generating Director Storage Resource for Autochanger:
+ - Autochanger_SSTK_L80_XYZZY_B-changer
+- Generating Storage Autochanger and Device Resources:
+ - Autochanger_SSTK_L80_XYZZY_B-changer with (4) drives
+  - Autochanger_SSTK_L80_XYZZY_B-changer_Dev0
+  - Autochanger_SSTK_L80_XYZZY_B-changer_Dev1
+  - Autochanger_SSTK_L80_XYZZY_B-changer_Dev2
+  - Autochanger_SSTK_L80_XYZZY_B-changer_Dev3
+- Storage Autochanger and Device Resources Done
 
 ------------------------------------
 Library: scsi-SSTK_L80_WAA_A-changer
 ------------------------------------
-- Generating Director Storage Resource for Autochanger: Autochanger_SSTK_L80_WAA_A-changer
- - Done
- - The 'bweb' variable is True, generating Director Storage Resource configuration files for each drive
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_WAA_A-changer_Dev0
-   - Done
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_WAA_A-changer_Dev1
-   - Done
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_WAA_A-changer_Dev2
-   - Done
-  - Generating Director Storage Resource for SD Drive Device: Autochanger_SSTK_L80_WAA_A-changer_Dev3
-   - Done
-- Generating Storage Autochanger And Device Resources
- - Generating Device Resource: Autochanger_SSTK_L80_WAA_A-changer_Dev0
-  - Done
- - Generating Device Resource: Autochanger_SSTK_L80_WAA_A-changer_Dev1
-  - Done
- - Generating Device Resource: Autochanger_SSTK_L80_WAA_A-changer_Dev2
-  - Done
- - Generating Device Resource: Autochanger_SSTK_L80_WAA_A-changer_Dev3
-  - Done
- - Storage Autochanger And Device Resources Done
+- Generating Director Storage Resource for Autochanger:
+ - Autochanger_SSTK_L80_WAA_A-changer
+- Generating Storage Autochanger and Device Resources:
+ - Autochanger_SSTK_L80_WAA_A-changer with (4) drives
+  - Autochanger_SSTK_L80_WAA_A-changer_Dev0
+  - Autochanger_SSTK_L80_WAA_A-changer_Dev1
+  - Autochanger_SSTK_L80_WAA_A-changer_Dev2
+  - Autochanger_SSTK_L80_WAA_A-changer_Dev3
+- Storage Autochanger and Device Resources Done
 
 
 =============================================================================================================
-DONE: Bacula resource configuration files and script log in: /tmp/bacula-resource-auto-creator_20240301203753
+DONE: Bacula resource configuration files and script log in: /tmp/bacula-resource-auto-creator_20240618211203
 =============================================================================================================
-Bacula Resource Auto Creator - v0.18 - bacula-resource-auto-creator.py
-By: Bill Arlofski waa@revpol.com (c) February 29, 2024
+Bacula Resource Auto Creator - v0.22 - bacula-resource-auto-creator.py
+By: Bill Arlofski waa@revpol.com (c) June 18, 2024
 
