@@ -65,7 +65,7 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.22'
+version = '0.23'
 reldate = 'June 18, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
@@ -142,10 +142,10 @@ def get_uname():
     'Get the OS uname to be use in other tests.'
     log('- Getting the OS uname for use in other tests')
     cmd = 'uname'
+    result = get_shell_result(cmd)
     if debug:
         log(' - shell command: ' + cmd)
         log_cmd_results(result)
-    result = get_shell_result(cmd)
     chk_cmd_result(result, cmd)
     return result.stdout.rstrip('\n')
 
