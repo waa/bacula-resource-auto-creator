@@ -45,15 +45,19 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ----------------------------------------------------------------------------
 #
+# ==================================================
+# Nothing below this line should need to be modified
+# ==================================================
+
 # Import the required modules
 # ---------------------------
 import os
 import re
 import sys
 import socket
+import argparse
 import subprocess
 from time import sleep
-from docopt import docopt
 from random import randint
 from datetime import datetime
 from ipaddress import ip_address, IPv4Address
@@ -61,18 +65,13 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.21'
-reldate = 'May 01, 2024'
+version = '0.22'
+reldate = 'June 18, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
 prog_info_txt = progname + ' - v' + version + ' - ' + scriptname \
               + '\nBy: ' + progauthor + ' ' + authoremail + ' (c) ' + reldate + '\n'
-
-# Do the tape drive(s) require that we issue
-# the mt offline before unloading a drive?
-# ------------------------------------------
-offline = False
 
 # list of tape libraries to skip during testing
 # ---------------------------------------------
@@ -81,32 +80,19 @@ offline = False
 # -------------------------------------------------------------------------------------
 libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'scsi-SSTK_L700_XYZZY_A-changer', 'otherLibToSkip']
 
-# Define the docopt string
-# ------------------------
-doc_opt_str = """
-Usage:
-  bacula-resource-auto-creator.py [-a <addr>] [-p <pass>] [-m <mcj>] [-s <secs>] [bweb] [debug] [offline]
-  bacula-resource-auto-creator.py -h | --help
-  bacula-resource-auto-creator.py -v | --version
-
-Options:
--a, --address <addr>     The FQDN (preferred), hostname, or IP address the Director will use to connect to this SD.
--p, --password <pass>    The password the Director will use to connect to this SD.
--m, --mcj <mcj>          The MaximumConcurrentJobs per SD Drive Device. [default: 1]
--s, --sleep_secs <secs>  The number of seconds to sleep between mtx and mt commands. [default: 15]
-
-bweb                     Do we create Director Storage resource configuration files for each SD Drive? [default: False]
-debug                    Enables logging of additional information such as the full 'mt', 'mtx', 'ls', and 'lsscsi' outputs. [default: False]
-offline                  Do the drives require to be sent the 'offline' command before unload? [default: False]
-
--h, --help               Print this help message.
--v, --version            Print the script name and version.
-
-"""
-
-# ==================================================
-# Nothing below this line should need to be modified
-# ==================================================
+# Define the argparse arguments, descriptions, defaults, etc
+# waa - Something to look into: https://www.reddit.com/r/Python/comments/11hqsbv/i_am_sick_of_writing_argparse_boilerplate_code_so/
+# ---------------------------------------------------------------------------------------------------------------------------------
+parser = argparse.ArgumentParser(prog=scriptname, description='Automatically create Bacula Storage, Tape Library Autochanger, and Tape Device Resource(s)')
+parser.add_argument('-v', '--version',    help='Print the script version.', version=scriptname + " v" + version, action='version')
+parser.add_argument('-a', '--address',    help='The FQDN (preferred), hostname, or IP address the Director will use to connect to this SD.', default=None)
+parser.add_argument('-b', '--bweb',       help='Do we create Director Storage resource configuration files for each SD Drive?', action='store_true')
+parser.add_argument('-d', '--debug',      help='Enables logging of additional information such as the full "mt", "mtx", "ls", and "lsscsi" outputs.', action='store_true')
+parser.add_argument('-m', '--mcj',        help='The MaximumConcurrentJobs per SD Drive Device.', type=int, default=1)
+parser.add_argument('-o', '--offline',    help='Do the drives require to be sent the "offline" command before unload?', action='store_true')
+parser.add_argument('-p', '--password',   help='The password the Director will use to connect to the SD.', default=None)
+parser.add_argument('-s', '--sleep_secs', help='The number of seconds to sleep between mtx and mt commands while this script is running.', type=int, default=15)
+args = parser.parse_args()
 
 # Now for some functions
 # ----------------------
@@ -116,8 +102,8 @@ def now():
 
 def usage():
     'Show the instructions and script information.'
-    print(doc_opt_str)
-    print(prog_info_txt)
+    parser.print_help()
+    print('\n' + prog_info_txt)
     sys.exit(1)
 
 def log(text):
@@ -138,18 +124,6 @@ def log_cmd_results(result):
     log('stdout: ' + ('\n[begin stdout]\n' + stdout + '\n[end stdout]' if '\n' in stdout else stdout))
     log('stderr: ' + ('\n[begin stderr]\n' + stderr + '\n[end stderr]' if '\n' in stderr else stderr))
 
-def print_opt_errors(opt):
-    'Print the incorrect variable and the reason it is incorrect.'
-    if opt == 'address':
-        error_txt = 'The address specified \'' + args['--address'] + '\' is not an IP address, or it does not resolve to one.'
-    elif opt == 'password':
-        error_txt = 'The password cannot be an empty string.'
-    elif opt == 'mcj':
-        error_txt = 'The mcj variable \'' + args['--mcj'] + '\' does not appear to be a number.'
-    elif opt == 'sleep':
-        error_txt = 'The sleep seconds \'' + args['--mcj'] + '\' does not appear to be a number.'
-    return '\n' + error_txt + '\n'
-
 def chk_cmd_result(result, cmd):
     'Given a result object, check the returncode, then log and exit if non zero.'
     if result.returncode != 0:
@@ -169,7 +143,8 @@ def get_uname():
     log('- Getting the OS uname for use in other tests')
     cmd = 'uname'
     if debug:
-        log('shell command: ' + cmd)
+        log(' - shell command: ' + cmd)
+        log_cmd_results(result)
     result = get_shell_result(cmd)
     chk_cmd_result(result, cmd)
     return result.stdout.rstrip('\n')
@@ -180,19 +155,17 @@ def get_ready_str():
     if uname == 'Linux':
         if os.path.isfile('/etc/debian_version'):
             cmd = 'mt --version | grep "mt-st"'
-            if debug:
-                log('mt command: ' + cmd)
             result = get_shell_result(cmd)
             if debug:
+                log('  - mt command: ' + cmd)
                 log_cmd_results(result)
             if result.returncode == 1:
                 return 'drive status'
         else:
             cmd = 'mt --version | grep "GNU cpio"'
-            if debug:
-                log('mt command: ' + cmd)
             result = get_shell_result(cmd)
             if debug:
+                log(' - mt command: ' + cmd)
                 log_cmd_results(result)
             if result.returncode == 0:
                 return 'drive status'
@@ -204,20 +177,20 @@ def get_ready_str():
     elif uname == 'OpenBSD':
         return 'ds=3<Mounted>'
     else:
-        print(print_opt_errors('uname'))
+        log('- The \'uname\' command failed to identify the OS or this OS is not supported.\n - OS reported: \'' + uname + '\'\n')
         usage()
 
 def lib_or_drv_status(cmd):
-    if debug:
-        log('Command: ' + cmd)
     result = get_shell_result(cmd)
     chk_cmd_result(result, cmd)
+    if debug:
+        log('- Command: ' + cmd)
+        log_cmd_results(result)
     return result
 
-def loaded(lib, index):
+def loaded(lib_status, index):
     'If the drive (index) is loaded, return the slot and volume that is in it, otherwise return 0, 0'
-    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
-    drive_loaded_line = re.search('Data Transfer Element ' + str(index) + ':Full.*', result.stdout)
+    drive_loaded_line = re.search('Data Transfer Element ' + str(index) + ':Full.*', lib_status)
     if drive_loaded_line is not None:
         slot_and_vol_loaded = (re.sub(r'^Data Transfer Element.*Element (\d+) Loaded.*= (\w+)', '\\1 \\2', drive_loaded_line.group(0))).split()
         slot_loaded = slot_and_vol_loaded[0]
@@ -225,26 +198,29 @@ def loaded(lib, index):
         log(' - Drive ' \
             + str(index) + ' is loaded with volume ' + vol_loaded + ' from slot ' + slot_loaded)
         if debug:
-            log('loaded output: ' + slot_loaded)
+            log('  - loaded output: ' + slot_loaded)
         return slot_loaded, vol_loaded
     else:
         log(' - Drive ' + str(index) + ' is empty')
         return '0', '0'
 
-def get_random_slot(lib):
+def get_random_slot(lib_status):
     'Return a pseudo-random slot that contains a tape and the volume name in the slot.'
-    result = lib_or_drv_status(r'mtx -f ' + byid_node_dir_str + '/' + lib + ' status | grep "Storage Element [0-9]\\{1,3\\}:Full" | grep -v "CLN"')
-    full_slots_lst = re.findall('Storage Element [0-9].?:Full.* ', result.stdout)
-    rand_int = randint(0, len(full_slots_lst) - 1)
-    slot = re.sub('Storage Element ([0-9].?):Full.*', '\\1', full_slots_lst[rand_int])
-    vol = re.sub('.*:VolumeTag=(.*).*', '\\1', full_slots_lst[rand_int]).rstrip()
-    return slot, vol
+    full_slots_lst = re.findall(r'Storage Element \d+:Full(?!.*CLN).*', lib_status)
+    if len(full_slots_lst) == 0:
+        return 0, 0
+    else:
+        rand_int = randint(0, len(full_slots_lst) - 1)
+        slot = re.sub('Storage Element ([0-9].?):Full.*', '\\1', full_slots_lst[rand_int])
+        vol = re.sub('.*:VolumeTag=(.*).*', '\\1', full_slots_lst[rand_int]).rstrip()
+        return slot, vol
 
 def unload(lib, slot, drive):
     cmd = 'mtx -f ' + byid_node_dir_str + '/' + lib + ' unload ' + slot + ' ' + str(drive)
-    if debug:
-        log('mtx command: ' + cmd)
     result = get_shell_result(cmd)
+    if debug:
+        log('  - mtx command: ' + cmd)
+        log_cmd_results(result)
     if result.returncode == 0:
         log('    - Unload successful')
     else:
@@ -273,22 +249,22 @@ def resolve(address):
     except Exception:
         return False
 
-def get_ip_address(address, prnt = True):
+def get_ip_address(address):
     'Given an address string, check if it is an IP, if not try to resolve it, and return an IP address'
     if is_ip_address(address):
-        if prnt:
+        if debug:
             log(' - \'' + address + '\' is an IP address')
         return address
     else:
-        if prnt:
+        if debug:
             log(' - \'' + address + '\' is not an IP address. Attempting to resolve...')
         ip = resolve(address)
         if ip == False:
-            if prnt:
+            if debug:
                 log('  - Oops, cannot resolve FQDN/host \'' + address + '\'')
             return False
         else:
-            if prnt:
+            if debug:
                 log('  - FQDN/host \'' + address + '\' resolves to IP address: ' + ip)
             return address
 
@@ -303,13 +279,22 @@ def get_sd_addr():
     else:
         return addr
 
+def get_sd_pass():
+    'Request the password that the Director will use to contact the Storage Daemon.'
+    sd_pass = input('\n- Please enter the password the Director will use to contact this SD: ').strip()
+    if len(sd_pass) == 0:
+        print(' - Password cannot be an empty string')
+        return False
+    else:
+       sd_pass_ok = input(' - Is the password \'' + sd_pass + '\' OK to use? [Y/n]: ').strip() or 'Y'
+       if sd_pass_ok not in ('Y', 'y'):
+           return False
+       else:
+           return sd_pass
+
 # ================
 # BEGIN THE SCRIPT
 # ================
-# Assign docopt doc string variable
-# ---------------------------------
-args = docopt(doc_opt_str, version='\n' + progname + ' - v' + version + '\n' + reldate + '\n')
-
 # Set the log directory and file name. This directory will also
 # be where we write the cut-n-paste Bacula resource configurations
 # ----------------------------------------------------------------
@@ -322,49 +307,15 @@ log_file = work_dir + '/' + lower_name_and_time + '.log'
 # -----------------------------
 os.mkdir(work_dir)
 
-# Assign / test variables from args dict
-# --------------------------------------
-debug = args['debug']
-bweb = args['bweb']
-offline = args['offline']
-
-# Address
-# -------
-if args['--address'] != None:
-    if get_ip_address(args['--address'], False):
-        sd_addr = args['--address']
-    else:
-        log(print_opt_errors('address'))
-        usage()
-else:
-    sd_addr = args['--address']
-
-# Password
-# --------
-if args['--password'] != None:
-    if len(args['--password']) > 0:
-        sd_pass = args['--password']
-    else:
-        log(print_opt_errors('password'))
-        usage()
-else:
-    sd_pass = args['--password']
-
-# mcj
-# ---
-if args['--mcj'].isdigit():
-    drive_mcj = int(args['--mcj'])
-else:
-    log(print_opt_errors('mcj'))
-    usage()
-
-# sleep_secs
-# ----------
-if args['--sleep_secs'].isdigit():
-    sleep_secs = int(args['--sleep_secs'])
-else:
-    log(print_opt_errors('sleep'))
-    usage()
+# Assign variables from argparse Namespace
+# ----------------------------------------
+sd_addr = args.address
+bweb = args.bweb
+debug = args.debug
+drive_mcj = args.mcj
+offline = args.offline
+sd_pass = args.password
+sleep_secs = args.sleep_secs
 
 # Create the lib_dict dictionary. It will hold {'libraryName': (index, 'drive_byid_node', 'st#', 'sg#'),...}
 # ----------------------------------------------------------------------------------------------------------
@@ -420,7 +371,7 @@ storage_device_tpl = """Device {
 
 # Log the startup header
 # ----------------------
-hdr = '[ Starting ' + sys.argv[0] + ' v' + version + ' ]'
+hdr = '[ Starting ' + progname + ' v' + version + ' ]'
 log('\n\n' + '='*10 + hdr + '='*10)
 log('- Command line: ' + str(' '.join(sys.argv)))
 log('- Work directory: ' + work_dir)
@@ -441,46 +392,35 @@ log('- The \'bweb\' variable is ' + str(bweb) + '. Will ' + ('' if bweb else 'no
 log('- The \'offline\' variable is ' + str(offline) + '. Will ' + ('' if offline else 'not ') \
      + 'send each drive the \'offline\' command before attempting to unload')
 
-# Using docopt, with a default of '1' set for the drive_mcj,
+# Using argparse, with a default of '1' set for the drive_mcj,
 # so just log the variable and where it came from
-# ----------------------------------------------------------
+# ------------------------------------------------------------
 log('- Each Drive Device will have \'MaximumConcurrentJobs = "' + str(drive_mcj) + '"\' ' \
      + ('(from command line)' if any(x in sys.argv for x in ('-m', '--mcj')) else '(default)'))
 
-# Using docopt, with a default of '10' set for the  sleep_secs
+# Using argparse, with a default of '15' set for the sleep_secs
 # variable, so just log the variable and where it came from
-# ------------------------------------------------------------
+# -------------------------------------------------------------
 log('- Sleep time between \'mtx\' and \'mt\' commands is ' + str(sleep_secs) + ' seconds ' \
-     + ('(from command line)' if any(x in sys.argv for x in ('-s', '--sleep')) else '(default)'))
+     + ('(from command line)' if any(x in sys.argv for x in ('-s', '--sleep_secs')) else '(default)'))
 
-# Ask for the Hostname, FQDN, or IP address of this SD
-# and verify that the Hostname or FQDN resolves to an IP
-# address before using it in the Director's Storage resource
-# ----------------------------------------------------------
-if sd_addr == None:
+# Ask for the Hostname, FQDN, or IP address needed to contact this SD
+# -------------------------------------------------------------------
+if sd_addr is None or not get_ip_address(sd_addr):
     sd_addr = False
     while not sd_addr:
         sd_addr = get_sd_addr()
-    log('  - Will use \'Address = "' + sd_addr + '"\' in the Director Storage resource to contact this SD')
+    log(('   ' if debug else '') + '- Will use \'Address = "' + sd_addr + '"\' in the Director Storage resource to contact this SD')
 else:
     log('- Will use \'Address = "' + sd_addr + '"\' (from command line) in the Director Storage resource to contact this SD')
 
-# Ask for the password neded to contact this SD from the Director
-# ---------------------------------------------------------------
-if sd_pass == None:
+# Ask for the password needed to contact this SD from the Director
+# ----------------------------------------------------------------
+if sd_pass is None or sd_pass == '':
     sd_pass = False
     while not sd_pass:
-        sd_pass = input('\n- Please enter the password the Director will use to contact this SD: ').strip()
-        if len(sd_pass) == 0:
-            print(' - Password cannot be an empty string')
-            sd_pass = False
-            continue
-        else:
-            sd_pass_ok = input(' - Is the password \'' + sd_pass + '\' OK to use? [Y/n]: ').strip() or 'Y'
-            if sd_pass_ok not in ('Y', 'y'):
-                sd_pass = False
-            else:
-                log('  - Will use \'Password = "' + sd_pass + '"\' in the Director Storage resource to contact this SD')
+        sd_pass = get_sd_pass()
+    log('  - Will use \'Password = "' + sd_pass + '"\' in the Director Storage resource to contact this SD')
 else:
     log('- Will use \'Password = "' + sd_pass + '"\' (from command line) in the Director Storage resource to contact this SD')
 
@@ -497,39 +437,44 @@ ready = get_ready_str()
 # -------------------------
 log('- Checking for lin_tape driver')
 cmd = 'lsmod | grep "^lin_tape" | wc -l'
-if debug:
-    log('lsmod command: ' + cmd)
 result = get_shell_result(cmd)
 chk_cmd_result(result, cmd)
+if debug:
+    log(' - lsmod command: ' + cmd)
+    log_cmd_results(result)
 if result.stdout.rstrip('\n') == '1':
-    log(' - Found the lin_tape kernel driver loaded')
+    log('   - Found the lin_tape kernel driver loaded')
     byid_node_dir_str = '/dev/lin_tape/by-id'
 else:
-    log(' - Did not find the lin_tape kernel driver loaded')
+    log('  - Did not find the lin_tape kernel driver loaded')
     byid_node_dir_str = '/dev/tape/by-id'
 
 # Create the byid_txt from all symlinks in /dev/(tape|lin_tape)/by-id directory
 # -----------------------------------------------------------------------------
+log('- Getting \'by-id\' device nodes')
 cmd = 'ls -l ' + byid_node_dir_str + ' | grep "^lrw"'
-if debug:
-    log('ls command: ' + cmd)
 result = get_shell_result(cmd)
 chk_cmd_result(result, cmd)
+if debug:
+    log(' - ls command: ' + cmd)
+    log_cmd_results(result)
 byid_txt = result.stdout.rstrip('\n')
 
 # Get lsscsi output for use later to determine Library and tape drive sg# nodes
 # -----------------------------------------------------------------------------
+log('- Getting \'lsscsi\' output')
 cmd = 'lsscsi -g | grep "tape\\|mediumx"'
-if debug:
-    log('lsscsi command: ' + cmd)
 result = get_shell_result(cmd)
 chk_cmd_result(result, cmd)
+if debug:
+    log(' - lsscsi command: ' + cmd)
+    log_cmd_results(result)
 lsscsi_txt = result.stdout.rstrip('\n')
 
 # Get the list of tape libraries' sg nodes
 # ----------------------------------------
 log('- Getting the list of tape libraries\' sg nodes')
-libs_sg_lst = re.findall(r'.* mediumx .*/(sg\d{1,3})', lsscsi_txt)
+libs_sg_lst = re.findall(r'.* mediumx .*/(sg\d+)', lsscsi_txt)
 num_libs = len(libs_sg_lst)
 log(' - Found ' + str(num_libs) + ' librar' + ('ies' if num_libs == 0 or num_libs > 1 else 'y'))
 log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_sg_lst)))
@@ -548,15 +493,17 @@ if num_libs != 0:
 # ----------------------------------------------------------------
 log('- Generating the tape drive list [(\'drive_byid_node\', \'st node\', \'sg node\'),...]')
 drive_byid_st_sg_lst = []
-for tuple in re.findall(r'.* (.+?-nst) -> .*/n(st\d{1,3})\n.*', byid_txt):
+for tuple in re.findall(r'.* (.+?-nst) -> .*/(nst\d+)\n', byid_txt):
     # TODO: Come up with a REAL fix. For some reason, OL9 creates
-    # additional symlink nodes in the /dev/tape-/by-id directory tree
-    # ---------------------------------------------------------------
+    # additional symlink nodes in the /dev/tape/by-id directory tree
+    # --------------------------------------------------------------
     # 20240227 - Just hide some extra drive nodes for demo. This should not hurt anything to leave
     # --------------------------------------------------------------------------------------------
     if not any(x in tuple[0] for x in ('WAA', 'XYZZY')):
-        sg = re.search('.*' + tuple[1] + ' .*/dev/(sg\\d+)', lsscsi_txt)
+        sg = re.search(r'.*' + tuple[1].lstrip('n') + ' .*/dev/(sg\d+)', lsscsi_txt)
         drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
+if debug:
+    log('drive_byid_st_sg_lst:\n---------------------\n' + str(drive_byid_st_sg_lst))
 log(' - Found ' + str(len(drive_byid_st_sg_lst)) + ' drive' + ('s' if len(drive_byid_st_sg_lst) > 1 else ''))
 log('  - Drive by-id nodes: ' + str(', '.join([r[0] for r in drive_byid_st_sg_lst])))
 log('- Startup complete')
@@ -572,21 +519,22 @@ if offline:
     for drive_byid in drive_byid_st_sg_lst:
         log(' - Drive ' + byid_node_dir_str + '/' + drive_byid[0])
         cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid[0] + ' offline'
-        if debug:
-            log('mt command: ' + cmd)
         result = get_shell_result(cmd)
         chk_cmd_result(result, cmd)
+        if debug:
+            log('  - mt command: ' + cmd)
+            log_cmd_results(result)
 else:
     log('- The \'offline\' variable is False, skip sending all drives offline command')
 
 # For each library found, unload each of the drives in it before
 # starting the process of identifying the Bacula DriveIndexes
 # --------------------------------------------------------------
-hdr = '\nUnloading All Tape Drives In The (' + str(num_libs) + ') Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
+hdr = '\nUnloading All (' + str(len(drive_byid_st_sg_lst)) + ') Tape Drives In The (' + str(num_libs) + ') Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in libs_byid_nodes_lst:
-    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
-    num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
+    lib_status = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
+    num_drives = len(re.findall('Data Transfer Element', lib_status.stdout, flags = re.DOTALL))
     hdr = '\n' + lib + ': Unloading (' + str(num_drives) + ') Tape Drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     if lib in libs_to_skip:
@@ -598,7 +546,7 @@ for lib in libs_byid_nodes_lst:
         drive_index = 0
         while drive_index < num_drives:
             log('- Checking if a tape is in drive ' + str(drive_index))
-            slot_loaded, vol_loaded = loaded(lib, drive_index)
+            slot_loaded, vol_loaded = loaded(lib_status.stdout, drive_index)
             if slot_loaded != '0':
                 log('  - Unloading volume ' + vol_loaded + ' from drive ' + str(drive_index) + ' to slot ' + slot_loaded)
                 unload(lib, slot_loaded, drive_index)
@@ -612,10 +560,10 @@ for lib in libs_byid_nodes_lst:
 hdr = '\nIterating Through Each Library Found\n'
 log('\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in libs_byid_nodes_lst:
-    result = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
-    num_drives = len(re.findall('Data Transfer Element', result.stdout, flags = re.DOTALL))
     hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
+    lib_status = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
+    num_drives = len(re.findall('Data Transfer Element', lib_status.stdout, flags = re.DOTALL))
     if lib in libs_to_skip:
         log(lib + ' is in the \'libs_to_skip\' list, skipping...\n')
         continue
@@ -624,18 +572,22 @@ for lib in libs_byid_nodes_lst:
         while drive_index < num_drives:
             hdr = '\nIdentifying DriveIndex ' + str(drive_index) + '\n'
             log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
-            slot, vol  = get_random_slot(lib)
+            slot, vol  = get_random_slot(lib_status.stdout)
+            if slot == 0 and vol == 0:
+                log(' - No full (non cleaning tape) slots found in library...')
+                break
             log('- Loading volume ' + vol + ' from slot ' + slot + ' into drive ' + str(drive_index))
             cmd = 'mtx -f ' + byid_node_dir_str + '/' + lib + ' load ' + slot + ' ' + str(drive_index)
-            if debug:
-                log('mtx command: ' + cmd)
             result = get_shell_result(cmd)
+            if debug:
+                log('  - mtx command: ' + cmd)
+                log_cmd_results(result)
             if result.returncode == 0:
                 log(' - Loaded OK')
             else:
                 log(' - Load FAILED')
             chk_cmd_result(result, cmd)
-            log('  - Sleeping ' + str(sleep_secs) + ' second' + ('s' if sleep_secs > 1 else '') + ' to allow drive to settle')
+            log('  - Sleeping ' + str(sleep_secs) + ' second' + ('s' if sleep_secs != 1 else '') + ' to allow drive to settle')
             sleep(sleep_secs)
 
             # Test by-id device nodes with mt to identify drive's Bacula 'DriveIndex' setting
@@ -674,7 +626,7 @@ for lib in lib_dict:
     hdr = '\nLibrary: ' + lib + '\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     for index_byid_st_sg_tuple in lib_dict[lib]:
-        log('ArchiveDevice = ' + byid_node_dir_str + '/' + index_byid_st_sg_tuple[1] + ' => DriveIndex = ' + str(index_byid_st_sg_tuple[0]))
+        log('ArchiveDevice = ' + byid_node_dir_str + '/' + index_byid_st_sg_tuple[1] + ' -> DriveIndex = ' + str(index_byid_st_sg_tuple[0]))
     log('')
 if len(drive_byid_st_sg_lst) != 0:
     drive_byid_st_sg_lst.sort()
@@ -685,7 +637,7 @@ log('='*80)
 
 # Generate the Bacula resource cut-n-paste configurations
 # -------------------------------------------------------
-hdr = '\nGenerating Bacula Resource Configuration Files For Each Library Found With Drives\n'
+hdr = '\nGenerating Bacula Resource Configuration Files For Each Library Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in lib_dict:
     hdr = '\nLibrary: ' + lib + '\n'
@@ -695,7 +647,8 @@ for lib in lib_dict:
     # Director Storage -> SD Autochanger
     # ----------------------------------
     res_txt = director_storage_tpl
-    log('- Generating Director Storage Resource for Autochanger: ' + autochanger_name)
+    log('- Generating Director Storage Resource for Autochanger:')
+    log(' - ' + autochanger_name)
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "Autochanger with (' \
             + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
@@ -706,7 +659,6 @@ for lib in lib_dict:
     res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * drive_mcj) + '"')
     res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
     write_res_file(work_dir + '/DirectorStorage_' + autochanger_name + '.cfg', res_txt)
-    log(' - Done')
 
     if bweb:
         # Director Storage -> SD Device(s) - This is primarily for BWeb
@@ -729,22 +681,22 @@ for lib in lib_dict:
             drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
             write_res_file(work_dir + '/DirectorStorage_' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
             dev += 1
-            log('   - Done')
 
     # Storage Autochanger
     # -------------------
     res_txt = storage_autochanger_tpl
-    log('- Generating Storage Autochanger And Device Resources')
+    log('- Generating Storage Autochanger and Device Resources:')
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
     res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
+    log(' - ' + autochanger_name + ' with (' + str(len(lib_dict[lib])) + ') drives')
     dev = 0
     autochanger_dev_str = ''
     while dev < len(lib_dict[lib]):
         # Create a Storage Device resource config file for each drive device in the Autochanger
         # -------------------------------------------------------------------------------------
         drv_res_txt = storage_device_tpl
-        log(' - Generating Storage Device Resource: ' + autochanger_name + '_Dev' + str(dev))
+        log('  - ' + autochanger_name + '_Dev' + str(dev))
         autochanger_dev_str += '"' + autochanger_name + '_Dev' + str(dev) + '"' + (', ' if dev <= (len(lib_dict[lib]) - 2) else '')
         drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Drive ' + str(dev) \
@@ -761,10 +713,9 @@ for lib in lib_dict:
         drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
         write_res_file(work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
         dev += 1
-        log('  - Done')
     res_txt = res_txt.replace(' Device =', ' Device = ' + autochanger_dev_str)
     write_res_file(work_dir + '/StorageAutochanger_' + autochanger_name + '.cfg', res_txt)
-    log(' - Storage Autochanger And Device Resources Done\n')
+    log('- Storage Autochanger and Device Resources Done\n')
 
 # Print location of log file and resource config files
 # ----------------------------------------------------
