@@ -65,8 +65,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.23'
-reldate = 'June 18, 2024'
+version = '0.24'
+reldate = 'August 29, 2024'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -83,7 +83,7 @@ libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'scsi-SSTK_L700_XYZZY_A-changer', 'oth
 # Define the argparse arguments, descriptions, defaults, etc
 # waa - Something to look into: https://www.reddit.com/r/Python/comments/11hqsbv/i_am_sick_of_writing_argparse_boilerplate_code_so/
 # ---------------------------------------------------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser(prog=scriptname, description='Automatically create Bacula Storage, Tape Library Autochanger, and Tape Device Resource(s)')
+parser = argparse.ArgumentParser(prog=scriptname, description='Automatically create Bacula Storage, Tape Library Autochanger, and Tape Device Resource(s).')
 parser.add_argument('-v', '--version',    help='Print the script version.', version=scriptname + " v" + version, action='version')
 parser.add_argument('-a', '--address',    help='The FQDN (preferred), hostname, or IP address the Director will use to connect to this SD.', default=None)
 parser.add_argument('-b', '--bweb',       help='Do we create Director Storage resource configuration files for each SD Drive?', action='store_true')
@@ -493,14 +493,14 @@ if num_libs != 0:
 # ----------------------------------------------------------------
 log('- Generating the tape drive list [(\'drive_byid_node\', \'st node\', \'sg node\'),...]')
 drive_byid_st_sg_lst = []
-for tuple in re.findall(r'.* (.+?-nst) -> .*/(nst\d+)\n', byid_txt):
+for tuple in re.findall(r'.* (.+?-nst) -> .*/(nst\d+)', byid_txt):
     # TODO: Come up with a REAL fix. For some reason, OL9 creates
     # additional symlink nodes in the /dev/tape/by-id directory tree
     # --------------------------------------------------------------
     # 20240227 - Just hide some extra drive nodes for demo. This should not hurt anything to leave
     # --------------------------------------------------------------------------------------------
     if not any(x in tuple[0] for x in ('WAA', 'XYZZY')):
-        sg = re.search(r'.*' + tuple[1].lstrip('n') + ' .*/dev/(sg\d+)', lsscsi_txt)
+        sg = re.search(r'.*' + tuple[1].lstrip('n') + ' .*/dev/(sg\\d+)', lsscsi_txt)
         drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
 if debug:
     log('drive_byid_st_sg_lst:\n---------------------\n' + str(drive_byid_st_sg_lst))
