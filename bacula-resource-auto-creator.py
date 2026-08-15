@@ -11,6 +11,8 @@
 #                  generate cut-n-paste Bacula resource configurations for
 #                  the Director Storage, the SD Autochanger it points to
 #                  and the Drive Devices in the Autochanger.
+# waa - 20280815 - This script now accomplishes the goals stated above.
+#                  More features to be added and fixes as issues are found.
 #
 # The latest version of this script may be found at: https://github.com/waa
 #
@@ -18,7 +20,7 @@
 #
 # BSD 2-Clause License
 #
-# Copyright (c) 2024, William A. Arlofski waa@revpol.com
+# Copyright (c) 2024-2026, William A. Arlofski waa@revpol.com
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -65,18 +67,18 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.24'
-reldate = 'August 29, 2024'
+version = '0.25'
+reldate = 'August 08, 2026'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
 prog_info_txt = progname + ' - v' + version + ' - ' + scriptname \
               + '\nBy: ' + progauthor + ' ' + authoremail + ' (c) ' + reldate + '\n'
 
-# list of tape libraries to skip during testing
+# List of tape libraries to skip during testing
 # ---------------------------------------------
-# If testing with mhVTL, skip the scsi-SSTK_L700_XYZZY_A library because it has LTO8/9
-# tapes and LTO8/9 drives. An error is thrown if an LTOx tape is loaded into LTOy drive
+# If testing with mhVTL, skip the scsi-SSTK_L700_XYZZY_A library because it has LTO6/8
+# tapes and LTO6/8 drives. An error is thrown if an LTOx tape is loaded into LTOy drive
 # -------------------------------------------------------------------------------------
 libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'scsi-SSTK_L700_XYZZY_A-changer', 'otherLibToSkip']
 
@@ -120,9 +122,9 @@ def log_cmd_results(result):
         stdout = 'N/A'
     if stderr == '':
         stderr = 'N/A'
-    log('returncode: ' + str(result.returncode))
-    log('stdout: ' + ('\n[begin stdout]\n' + stdout + '\n[end stdout]' if '\n' in stdout else stdout))
-    log('stderr: ' + ('\n[begin stderr]\n' + stderr + '\n[end stderr]' if '\n' in stderr else stderr))
+    log(' - returncode: ' + str(result.returncode))
+    log(' - stdout: ' + ('\n[begin stdout]\n' + stdout + '\n[end stdout]' if '\n' in stdout else stdout))
+    log(' - stderr: ' + ('\n[begin stderr]\n' + stderr + '\n[end stderr]' if '\n' in stderr else stderr))
 
 def chk_cmd_result(result, cmd):
     'Given a result object, check the returncode, then log and exit if non zero.'
@@ -130,7 +132,10 @@ def chk_cmd_result(result, cmd):
         if 'Device or resource busy' in result.stderr:
             log('  - Device is "busy", probably locked by another process. Please be sure \'bacula-sd\' is not running')
             log('   - Exiting with errorlevel ' + str(result.returncode))
-        log_cmd_results(result)
+        else:
+            log('\n- Command: ' + cmd)
+            log_cmd_results(result)
+            log('- Exiting with returncode ' + str(result.returncode))
         log('\n' + '='*(prog_info_txt.find('\n')) + '\n' + prog_info_txt)
         sys.exit(result.returncode)
 
@@ -295,17 +300,22 @@ def get_sd_pass():
 # ================
 # BEGIN THE SCRIPT
 # ================
-# Set the log directory and file name. This directory will also
+# Set the log and output directories. This directory will also
 # be where we write the cut-n-paste Bacula resource configurations
 # ----------------------------------------------------------------
 date_stamp = now()
 lower_name_and_time = progname.replace(' ', '-').lower() + '_' + date_stamp
 work_dir = '/tmp/' + lower_name_and_time
+dir_st_dir = work_dir + '/Director/Storage'
+sd_auto_dir = work_dir + '/Storage/Autochanger'
+sd_device_dir = work_dir + '/Storage/Device'
 log_file = work_dir + '/' + lower_name_and_time + '.log'
 
-# Create the work_dir directory
-# -----------------------------
-os.mkdir(work_dir)
+# Create the work_dir directory and resource subdirectories
+# ---------------------------------------------------------
+os.makedirs(dir_st_dir)
+os.makedirs(sd_auto_dir)
+os.makedirs(sd_device_dir)
 
 # Assign variables from argparse Namespace
 # ----------------------------------------
@@ -346,6 +356,9 @@ storage_autochanger_tpl = """Autochanger {
   Description =
   ChangerDevice =
   ChangerCommand = "/opt/bacula/scripts/mtx-changer %c %o %S %a %d"
+  # waa - 20260814 - My drop-in mtx-changer script replacement. See https://github.com/waa for details
+  # --------------------------------------------------------------------------------------------------
+  # ChangerCommand = "/opt/bacula/scripts/mtx-changer-python.py -s autochanger_name %c %o %S %a %d -i %i -j %j"
   Device =
 }
 """
@@ -362,10 +375,17 @@ storage_device_tpl = """Device {
   LabelMedia = "no"
   RandomAccess = "no"
   RemovableMedia = "yes"
-  ControlDevice =
-  AlertCommand = "/opt/bacula/scripts/tapealert %l"
   ArchiveDevice =
+  ControlDevice =
   MaximumConcurrentJobs =
+  AlertCommand = "/opt/bacula/scripts/tapealert %l"
+  # waa - 20260814 - My drop-in tapealert script replacement. See https://github.com/waa for details
+  # ------------------------------------------------------------------------------------------------
+  # AlertCommand = "/opt/bacula/scripts/bacula-tapealert.py %a -i %i -e admin@example.com --logging --file /opt/bacula/log/storage_device_nst_node"
+  # Tested best with btape on LTO8 and LTO9 drives
+  # ----------------------------------------------
+  MaximumFileSize = 32GB
+  MaximumBlockSize = 2097152
 }
 """
 
@@ -443,16 +463,16 @@ if debug:
     log(' - lsmod command: ' + cmd)
     log_cmd_results(result)
 if result.stdout.rstrip('\n') == '1':
-    log('   - Found the lin_tape kernel driver loaded')
+    log('  - Found the lin_tape kernel driver loaded')
     byid_node_dir_str = '/dev/lin_tape/by-id'
 else:
-    log('  - Did not find the lin_tape kernel driver loaded')
+    log(' - Did not find the lin_tape kernel driver loaded')
     byid_node_dir_str = '/dev/tape/by-id'
 
-# Create the byid_txt from all symlinks in /dev/(tape|lin_tape)/by-id directory
-# -----------------------------------------------------------------------------
+# Create the byid_txt from all symlinks in /dev/tape/by-id directory
+# ------------------------------------------------------------------
 log('- Getting \'by-id\' device nodes')
-cmd = 'ls -l ' + byid_node_dir_str + ' | grep "^lrw"'
+cmd = 'ls -l ' + byid_node_dir_str + ' | grep "^lrw" | tr -s \' \' | cut -d \' \' -f9- | sort'
 result = get_shell_result(cmd)
 chk_cmd_result(result, cmd)
 if debug:
@@ -475,6 +495,7 @@ lsscsi_txt = result.stdout.rstrip('\n')
 # ----------------------------------------
 log('- Getting the list of tape libraries\' sg nodes')
 libs_sg_lst = re.findall(r'.* mediumx .*/(sg\d+)', lsscsi_txt)
+libs_sg_lst.sort()
 num_libs = len(libs_sg_lst)
 log(' - Found ' + str(num_libs) + ' librar' + ('ies' if num_libs == 0 or num_libs > 1 else 'y'))
 log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_sg_lst)))
@@ -485,20 +506,31 @@ if num_libs != 0:
     libs_byid_nodes_lst = []
     log('- Determining libraries\' by-id nodes from their sg nodes')
     for lib_sg in libs_sg_lst:
-        libs_byid_nodes_lst.append(re.sub('.* (.+?) ->.*/' + lib_sg + '.*', '\\1', byid_txt, flags = re.DOTALL))
+        # This 'if' is to resolve Github issue #2. User's lsscsi output
+        # showed two sg nodes for libraries, but the byid_txt output showed
+        # only one, breaking the append() call below
+        # waa - 20260814 - This so called fix from back in 2025 will not resolve
+        #                  the issue. The problem is that this script currently
+        #                  does not support multipathed tape libraries and drives
+        #                - This fixes the issue where udev recently started creating
+        #                  multiple /dev/tape/by-id symlinks per device.
+        #                - This needs a proper attempt at a multipath fix :)
+        # --------------------------------------------------------------------------
+        if byid_txt.find(lib_sg):
+            tmp_lst = (re.findall(r'(.+?) -> .*/' + lib_sg + '.*', byid_txt))
+            libs_byid_nodes_lst.append(min(tmp_lst, key=len))
+        else:
+            log(' - WARN: The libary sg node ' + lib_sg + ' does not appear in the \'byid_txt\', skipping')
     log(' - Library by-id node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_byid_nodes_lst)))
-
 # Get each drive's by-id node, nst# node, and sg# node and create
 # the drive_byid_st_sg_lst [('drive_byid_node', 'st#', 'sg#'),...]
 # ----------------------------------------------------------------
 log('- Generating the tape drive list [(\'drive_byid_node\', \'st node\', \'sg node\'),...]')
 drive_byid_st_sg_lst = []
-for tuple in re.findall(r'.* (.+?-nst) -> .*/(nst\d+)', byid_txt):
-    # TODO: Come up with a REAL fix. For some reason, OL9 creates
-    # additional symlink nodes in the /dev/tape/by-id directory tree
-    # --------------------------------------------------------------
-    # 20240227 - Just hide some extra drive nodes for demo. This should not hurt anything to leave
-    # --------------------------------------------------------------------------------------------
+for tuple in re.findall(r'(.+?-nst) -> .*/(nst\d+)', byid_txt):
+    # 20240227 - Just hide some extra drive nodes from my mhVTL development
+    #            environment. This should not hurt anything to leave
+    # ---------------------------------------------------------------------
     if not any(x in tuple[0] for x in ('WAA', 'XYZZY')):
         sg = re.search(r'.*' + tuple[1].lstrip('n') + ' .*/dev/(sg\\d+)', lsscsi_txt)
         drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
@@ -507,25 +539,28 @@ if debug:
 log(' - Found ' + str(len(drive_byid_st_sg_lst)) + ' drive' + ('s' if len(drive_byid_st_sg_lst) > 1 else ''))
 log('  - Drive by-id nodes: ' + str(', '.join([r[0] for r in drive_byid_st_sg_lst])))
 log('- Startup complete')
-
 # If 'offline' is True send the offline command to all drives first
 # -----------------------------------------------------------------
-hdr = '\nChecking if we send the \'offline\' command to all drives in the Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
+hdr = '\nChecking If We Send The \'offline\' Command To All Drives In The Librar' + ('ies' if num_libs > 1 else 'y') + ' Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 if offline:
-    # First send each drive the offline command
-    # -----------------------------------------
-    log('- The \'offline\' variable is True, sending all drives offline command')
+    log('- The \'offline\' variable is True, sending all empty drives the \'mt offline\' command')
     for drive_byid in drive_byid_st_sg_lst:
-        log(' - Drive ' + byid_node_dir_str + '/' + drive_byid[0])
-        cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid[0] + ' offline'
+        log(' - Checking drive ' + byid_node_dir_str + '/' + byid_node_dir_str + '/' + drive_byid[0])
+        cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid[0] + ' status'
         result = get_shell_result(cmd)
-        chk_cmd_result(result, cmd)
-        if debug:
-            log('  - mt command: ' + cmd)
-            log_cmd_results(result)
+        if re.search(ready, result.stdout, re.DOTALL):
+            print('  - Drive ' + byid_node_dir_str + '/' + drive_byid[0] + ' is loaded, sending \'mt offline\' command')
+            cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid[0] + ' offline'
+            result = get_shell_result(cmd)
+            chk_cmd_result(result, cmd)
+            if debug:
+                log('  - mt command: ' + cmd)
+                log_cmd_results(result)
+        else:
+            print('  - Drive ' + byid_node_dir_str + '/' + drive_byid[0] + ' is empty')
 else:
-    log('- The \'offline\' variable is False, skip sending all drives offline command')
+    log('- The \'offline\' variable is False, skip sending all drives the \'mt offline\' command')
 
 # For each library found, unload each of the drives in it before
 # starting the process of identifying the Bacula DriveIndexes
@@ -560,10 +595,10 @@ for lib in libs_byid_nodes_lst:
 hdr = '\nIterating Through Each Library Found\n'
 log('\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 for lib in libs_byid_nodes_lst:
-    hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
-    log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     lib_status = lib_or_drv_status('mtx -f ' + byid_node_dir_str + '/' + lib + ' status')
     num_drives = len(re.findall('Data Transfer Element', lib_status.stdout, flags = re.DOTALL))
+    hdr = '\nLibrary \'' + lib + '\' with (' + str(num_drives) + ') drives\n'
+    log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     if lib in libs_to_skip:
         log(lib + ' is in the \'libs_to_skip\' list, skipping...\n')
         continue
@@ -620,13 +655,15 @@ for lib in libs_byid_nodes_lst:
                         log(' - EMPTY: Drive by-id node \'' + drive_byid_node[0] + '\' is empty')
             drive_index += 1
         log('')
-hdr = '[ Bacula Drive \'ArchiveDevice\' => Bacula \'DriveIndex\' settings ]'
+hdr = '[ Bacula Drive \'DriveIndex\' -> \'ArchiveDevice\' settings ]'
 log('\n' + '='*8 + hdr + '='*8) 
 for lib in lib_dict:
     hdr = '\nLibrary: ' + lib + '\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     for index_byid_st_sg_tuple in lib_dict[lib]:
-        log('ArchiveDevice = ' + byid_node_dir_str + '/' + index_byid_st_sg_tuple[1] + ' -> DriveIndex = ' + str(index_byid_st_sg_tuple[0]))
+        log('DriveIndex = ' + str(index_byid_st_sg_tuple[0]))
+        log(' ControlDevice = ' + index_byid_st_sg_tuple[3])
+        log(' ArchiveDevice = ' + byid_node_dir_str + '/' + index_byid_st_sg_tuple[1])
     log('')
 if len(drive_byid_st_sg_lst) != 0:
     drive_byid_st_sg_lst.sort()
@@ -644,8 +681,8 @@ for lib in lib_dict:
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
 
-    # Director Storage -> SD Autochanger
-    # ----------------------------------
+    # Director Storage
+    # ----------------
     res_txt = director_storage_tpl
     log('- Generating Director Storage Resource for Autochanger:')
     log(' - ' + autochanger_name)
@@ -658,7 +695,7 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
     res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * drive_mcj) + '"')
     res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-    write_res_file(work_dir + '/DirectorStorage_' + autochanger_name + '.cfg', res_txt)
+    write_res_file(dir_st_dir + '/' + autochanger_name + '.cfg', res_txt)
 
     if bweb:
         # Director Storage -> SD Device(s) - This is primarily for BWeb
@@ -679,7 +716,7 @@ for lib in lib_dict:
             drv_res_txt = drv_res_txt.replace('Device =', 'Device = "' + autochanger_name + '_Dev' + str(dev) + '"')
             drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(drive_mcj) + '"')
             drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-            write_res_file(work_dir + '/DirectorStorage_' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
+            write_res_file(dir_st_dir + '/' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
             dev += 1
 
     # Storage Autochanger
@@ -689,18 +726,19 @@ for lib in lib_dict:
     res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
     res_txt = res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
     res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
+    res_txt = res_txt.replace('autochanger_name', autochanger_name)
     log(' - ' + autochanger_name + ' with (' + str(len(lib_dict[lib])) + ') drives')
     dev = 0
     autochanger_dev_str = ''
     while dev < len(lib_dict[lib]):
-        # Create a Storage Device resource config file for each drive device in the Autochanger
-        # -------------------------------------------------------------------------------------
+        # Storage Device resource config file for each drive device in the Autochanger
+        # ----------------------------------------------------------------------------
         drv_res_txt = storage_device_tpl
         log('  - ' + autochanger_name + '_Dev' + str(dev))
         autochanger_dev_str += '"' + autochanger_name + '_Dev' + str(dev) + '"' + (', ' if dev <= (len(lib_dict[lib]) - 2) else '')
         drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Drive ' + str(dev) \
-                    + ' in ' + autochanger_name + ' - ' +created_by_str + '"')
+                    + ' in ' + autochanger_name + ' - ' + created_by_str + '"')
         drv_res_txt = drv_res_txt.replace('DriveIndex =', 'DriveIndex = "' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
         drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(drive_mcj) + '"')
@@ -711,10 +749,11 @@ for lib in lib_dict:
                 continue
         drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
         drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
-        write_res_file(work_dir + '/StorageDevice_' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
+        drv_res_txt = drv_res_txt.replace('storage_device_nst_node', autochanger_name + '_Dev' + str(dev) + '.log')
+        write_res_file(sd_device_dir + '/' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
         dev += 1
     res_txt = res_txt.replace(' Device =', ' Device = ' + autochanger_dev_str)
-    write_res_file(work_dir + '/StorageAutochanger_' + autochanger_name + '.cfg', res_txt)
+    write_res_file(sd_auto_dir + '/' + autochanger_name + '.cfg', res_txt)
     log('- Storage Autochanger and Device Resources Done\n')
 
 # Print location of log file and resource config files
