@@ -60,6 +60,7 @@ import socket
 import argparse
 import subprocess
 from time import sleep
+from pathlib import Path
 from random import randint
 from datetime import datetime
 from ipaddress import ip_address, IPv4Address
@@ -67,8 +68,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.25'
-reldate = 'August 08, 2026'
+version = '0.26'
+reldate = 'August 16, 2026'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -297,6 +298,25 @@ def get_sd_pass():
        else:
            return sd_pass
 
+def match_sym_to_scsi(sym):
+    'Given a /sys/class/(scsi_generic|scsi_tape)/(sg*|nst*), return H:C:T:L'
+    dev_path = sym / 'device'
+    full = os.path.realpath(dev_path)
+    name = os.path.basename(full)
+    if re.fullmatch(r'\d+:\d+:\d+:\d+', name):
+        return name
+    return None
+
+def get_sys_class(sg_or_tape):
+    'Get /sys/class/(scsi_generic|(scsi_tape/nst*|lin_tape/IBM*)) nodes'
+    if sg_or_tape == 'sg':
+        sym_type = 'scsi_generic'
+    elif sg_or_tape == 'tape':
+        sym_type = tape_type
+    dir = Path('/sys/class/' + sym_type)
+    sym_links = sorted(dir.iterdir())
+    return sym_links
+
 # ================
 # BEGIN THE SCRIPT
 # ================
@@ -464,9 +484,13 @@ if debug:
     log_cmd_results(result)
 if result.stdout.rstrip('\n') == '1':
     log('  - Found the lin_tape kernel driver loaded')
+    dev_node = 'IBMtape'
+    tape_type = 'lin_tape'
     byid_node_dir_str = '/dev/lin_tape/by-id'
 else:
     log(' - Did not find the lin_tape kernel driver loaded')
+    dev_node = 'nst'
+    tape_type = 'scsi_tape'
     byid_node_dir_str = '/dev/tape/by-id'
 
 # Create the byid_txt from all symlinks in /dev/tape/by-id directory
@@ -503,7 +527,11 @@ log('  - Library sg node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join
 # Get the corresponding by-id node from the libraries' sg nodes
 # -------------------------------------------------------------
 if num_libs != 0:
+    sg_scsi_lst = []
+    tape_scsi_lst = []
+    nst_node_tuple_lst =[]
     libs_byid_nodes_lst = []
+    drive_byid_st_sg_lst = []
     log('- Determining libraries\' by-id nodes from their sg nodes')
     for lib_sg in libs_sg_lst:
         # This 'if' is to resolve Github issue #2. User's lsscsi output
@@ -518,6 +546,8 @@ if num_libs != 0:
         # --------------------------------------------------------------------------
         if byid_txt.find(lib_sg):
             tmp_lst = (re.findall(r'(.+?) -> .*/' + lib_sg + '.*', byid_txt))
+            # Get the shortest symlink name for consistency in 'ChangerDevice' names
+            # ----------------------------------------------------------------------
             libs_byid_nodes_lst.append(min(tmp_lst, key=len))
         else:
             log(' - WARN: The libary sg node ' + lib_sg + ' does not appear in the \'byid_txt\', skipping')
@@ -526,18 +556,56 @@ if num_libs != 0:
 # the drive_byid_st_sg_lst [('drive_byid_node', 'st#', 'sg#'),...]
 # ----------------------------------------------------------------
 log('- Generating the tape drive list [(\'drive_byid_node\', \'st node\', \'sg node\'),...]')
-drive_byid_st_sg_lst = []
-for tuple in re.findall(r'(.+?-nst) -> .*/(nst\d+)', byid_txt):
-    # 20240227 - Just hide some extra drive nodes from my mhVTL development
-    #            environment. This should not hurt anything to leave
-    # ---------------------------------------------------------------------
-    if not any(x in tuple[0] for x in ('WAA', 'XYZZY')):
-        sg = re.search(r'.*' + tuple[1].lstrip('n') + ' .*/dev/(sg\\d+)', lsscsi_txt)
-        drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg.group(1)))
+
+# Build the list of tuples of [('sg_symlink', 'H:C:T:L'),...]
+# -----------------------------------------------------------
+sg_sym_links = get_sys_class('sg')
+for sym in sg_sym_links:
+    result = match_sym_to_scsi(sym)
+    sg_scsi_lst.append((str(sym), result))
+
+# Build the list of tuples of [('tape_symlink', 'H:C:T:L'),...]
+# -------------------------------------------------------------
+tape_sym_links = get_sys_class('tape')
+for sym in tape_sym_links:
+    result = match_sym_to_scsi(sym)
+    tape_scsi_lst.append((str(sym), result))
+
+# Create the nst_node_tuple_lst consisting of tuples of ('shortest -nst symlink', '/dev/real_node')
+# -------------------------------------------------------------------------------------------------
+byid_nodes_lst = re.findall(r'(.+?-nst) -> .*/(' + dev_node + '\d+)', byid_txt)
+for node in byid_nodes_lst:
+    tmp_lst = re.findall(r'(.+?-nst) -> .*/(' + node[1] + ')', byid_txt)
+    if (not any(tmp_lst[0][1] in i for i in nst_node_tuple_lst)):
+        shortest_nst = min(tmp_lst, key=lambda t: len(t[0]))
+        nst_node_tuple_lst.append(shortest_nst)
+
+# Iterate through all entries in nst_node_tuple_lst, appending the proper sg node
+# to the tuples, creating a list of tuples like: [('nst', '/dev/real_node', 'sg')]
+# --------------------------------------------------------------------------------
+for tuple in nst_node_tuple_lst:
+    # To reliably find the /dev/sg# node for a tape drive, we get the tape's
+    # H:C:T:L scsi from tape_scsi_lst and match it to the H:C:T:L in
+    # sg_scsi_lst and grab the sg_symlink from that tuple
+    # This works for /dev/tape/by-id/*.nst, and /dev/lintape/IBMtape* devices
+    # -----------------------------------------------------------------------
+    tape_nst = tuple[1]
+    for tape_nst_tuple in tape_scsi_lst:
+        if tape_nst in tape_nst_tuple[0]:
+            scsi = tape_nst_tuple[1]
+            break
+    for sg_scsi_tuple in sg_scsi_lst:
+        if scsi in sg_scsi_tuple[1]:
+            sg = re.sub('.*/(.*)', '\\1', sg_scsi_tuple[0])
+            break
+    drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg))
+    num_drives = len(drive_byid_st_sg_lst)
+
 if debug:
     log('drive_byid_st_sg_lst:\n---------------------\n' + str(drive_byid_st_sg_lst))
-log(' - Found ' + str(len(drive_byid_st_sg_lst)) + ' drive' + ('s' if len(drive_byid_st_sg_lst) > 1 else ''))
-log('  - Drive by-id nodes: ' + str(', '.join([r[0] for r in drive_byid_st_sg_lst])))
+log(' - Found ' + str(num_drives) + ' drive' + ('s' if num_drives > 1 else ''))
+log('  - Drive sg node' + ('s' if num_drives > 1 else '') + ': ' + str(', '.join(r[2] for r in drive_byid_st_sg_lst)))
+log('  - Drive by-id node' + ('s' if num_drives > 1 else '') + ': ' + str(', '.join([r[0] for r in drive_byid_st_sg_lst])))
 log('- Startup complete')
 # If 'offline' is True send the offline command to all drives first
 # -----------------------------------------------------------------
@@ -546,7 +614,7 @@ log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
 if offline:
     log('- The \'offline\' variable is True, sending all empty drives the \'mt offline\' command')
     for drive_byid in drive_byid_st_sg_lst:
-        log(' - Checking drive ' + byid_node_dir_str + '/' + byid_node_dir_str + '/' + drive_byid[0])
+        log(' - Checking drive ' + byid_node_dir_str + '/' + drive_byid[0])
         cmd = 'mt -f ' + byid_node_dir_str + '/' + drive_byid[0] + ' status'
         result = get_shell_result(cmd)
         if re.search(ready, result.stdout, re.DOTALL):
