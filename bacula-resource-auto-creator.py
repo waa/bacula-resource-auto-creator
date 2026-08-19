@@ -68,8 +68,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname = 'Bacula Resource Auto Creator'
-version = '0.26'
-reldate = 'August 16, 2026'
+version = '0.27'
+reldate = 'August 18, 2026'
 progauthor = 'Bill Arlofski'
 authoremail = 'waa@revpol.com'
 scriptname = 'bacula-resource-auto-creator.py'
@@ -88,6 +88,7 @@ libs_to_skip = ['scsi-SSTK_L700_XYZZY_A', 'scsi-SSTK_L700_XYZZY_A-changer', 'oth
 # ---------------------------------------------------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(prog=scriptname, description='Automatically create Bacula Storage, Tape Library Autochanger, and Tape Device Resource(s).')
 parser.add_argument('-v', '--version',    help='Print the script version.', version=scriptname + " v" + version, action='version')
+parser.add_argument('-1', '--one',        help='Create one file for the Director and one File for the Storage Daemon.', action='store_true')
 parser.add_argument('-a', '--address',    help='The FQDN (preferred), hostname, or IP address the Director will use to connect to this SD.', default=None)
 parser.add_argument('-b', '--bweb',       help='Do we create Director Storage resource configuration files for each SD Drive?', action='store_true')
 parser.add_argument('-d', '--debug',      help='Enables logging of additional information such as the full "mt", "mtx", "ls", and "lsscsi" outputs.', action='store_true')
@@ -339,6 +340,7 @@ os.makedirs(sd_device_dir)
 
 # Assign variables from argparse Namespace
 # ----------------------------------------
+one_file = args.one
 sd_addr = args.address
 bweb = args.bweb
 debug = args.debug
@@ -548,10 +550,27 @@ if num_libs != 0:
             tmp_lst = (re.findall(r'(.+?) -> .*/' + lib_sg + '.*', byid_txt))
             # Get the shortest symlink name for consistency in 'ChangerDevice' names
             # ----------------------------------------------------------------------
-            libs_byid_nodes_lst.append(min(tmp_lst, key=len))
+            # waa - 202660817 - Stolen from the drive section below. Need to do the
+            #                   same here, or put into a function that both sections
+            #                   can call.
+            # byid_nodes_lst = re.findall(r'(.+?-nst) -> .*/(' + dev_node + '\d+)', byid_txt)
+            # for node in byid_nodes_lst:
+            #     tmp_lst = re.findall(r'(.+?-nst) -> .*/(' + node[1] + ')', byid_txt)
+            #     if (not any(tmp_lst[0][1] in i for i in nst_node_tuple_lst)):
+            #         shortest_nst = min(tmp_lst, key=lambda t: len(t[0]))
+            #         nst_node_tuple_lst.append(shortest_nst)
+
+            # In a multipathed system it is possible that udev is configured
+            # to only create one /dev/lin_tape/by-id symlink to as library.
+            # --------------------------------------------------------------
+            if len(tmp_lst) != 0:
+                libs_byid_nodes_lst.append(min(tmp_lst, key=len))
+            else:
+                log(' - Didn\'t find a ' + byid_node_dir_str + '/* symlink for ' + lib_sg + ', skipping')
         else:
             log(' - WARN: The libary sg node ' + lib_sg + ' does not appear in the \'byid_txt\', skipping')
     log(' - Library by-id node' + ('s' if num_libs > 1 else '') + ': ' + str(', '.join(libs_byid_nodes_lst)))
+
 # Get each drive's by-id node, nst# node, and sg# node and create
 # the drive_byid_st_sg_lst [('drive_byid_node', 'st#', 'sg#'),...]
 # ----------------------------------------------------------------
@@ -599,7 +618,7 @@ for tuple in nst_node_tuple_lst:
             sg = re.sub('.*/(.*)', '\\1', sg_scsi_tuple[0])
             break
     drive_byid_st_sg_lst.append((tuple[0], tuple[1], sg))
-    num_drives = len(drive_byid_st_sg_lst)
+num_drives = len(drive_byid_st_sg_lst)
 
 if debug:
     log('drive_byid_st_sg_lst:\n---------------------\n' + str(drive_byid_st_sg_lst))
@@ -740,43 +759,51 @@ if len(drive_byid_st_sg_lst) != 0:
     log(', '.join([byid for byid, st, sg in drive_byid_st_sg_lst]))
 log('='*80)
 
-# Generate the Bacula resource cut-n-paste configurations
-# -------------------------------------------------------
+# Generate the Bacula resource cut-n-paste/copy file configurations
+# -----------------------------------------------------------------
 hdr = '\nGenerating Bacula Resource Configuration Files For Each Library Found\n'
 log('\n\n' + '='*(len(hdr) - 2) + hdr + '='*(len(hdr) - 2))
+if one_file:
+    one_sd_txt = ''
+    one_dir_txt = ''
+    dir_drv_res_txt = ''
+    sd_file_name = 'SD_include.cfg'
+    dir_file_name = 'DIR-Storage_include.cfg'
 for lib in lib_dict:
     hdr = '\nLibrary: ' + lib + '\n'
     log('-'*(len(hdr) - 2) + hdr + '-'*(len(hdr) - 2))
     autochanger_name = 'Autochanger_' + lib.replace('scsi-', '')
 
-    # Director Storage
-    # ----------------
-    res_txt = director_storage_tpl
+    # Director Storage Resource(s)
+    # ----------------------------
     log('- Generating Director Storage Resource for Autochanger:')
     log(' - ' + autochanger_name)
-    res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
-    res_txt = res_txt.replace('Description =', 'Description = "Autochanger with (' \
-            + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
-    res_txt = res_txt.replace('Address =', 'Address = "' + sd_addr + '"')
-    res_txt = res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
-    res_txt = res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
-    res_txt = res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
-    res_txt = res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * drive_mcj) + '"')
-    res_txt = res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-    write_res_file(dir_st_dir + '/' + autochanger_name + '.cfg', res_txt)
+    dir_res_txt = director_storage_tpl
+    dir_res_txt = dir_res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
+    dir_res_txt = dir_res_txt.replace('Description =', 'Description = "Autochanger with (' \
+                + str(len(lib_dict[lib])) + ') drives - ' + created_by_str + '"')
+    dir_res_txt = dir_res_txt.replace('Address =', 'Address = "' + sd_addr + '"')
+    dir_res_txt = dir_res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
+    dir_res_txt = dir_res_txt.replace('Autochanger =', 'Autochanger = "' + autochanger_name + '"')
+    dir_res_txt = dir_res_txt.replace('Device =', 'Device = "' + autochanger_name + '"')
+    dir_res_txt = dir_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(len(lib_dict[lib]) * drive_mcj) + '"')
+    dir_res_txt = dir_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
+    if not one_file:
+        write_res_file(dir_st_dir + '/' + autochanger_name + '.cfg', dir_res_txt)
 
     if bweb:
-        # Director Storage -> SD Device(s) - This is primarily for BWeb
-        # -------------------------------------------------------------
+        # Individual Director Storage -> SD Device(s) - This is necessary for BWeb to manage tape libraries
+        # -------------------------------------------------------------------------------------------------
         log(' - The \'bweb\' variable is True, generating Director Storage Resource configuration files for each drive')
         dev = 0
+        dir_drv_res_txt = ''
         while dev < len(lib_dict[lib]):
             # Create a Director Storage resource config file for each drive device in the Autochanger
             # ---------------------------------------------------------------------------------------
-            drv_res_txt = director_storage_tpl
             log('  - Generating Director Storage Resource: ' + autochanger_name + '_Dev' + str(dev))
+            drv_res_txt = director_storage_tpl
             drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
-            drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Stand-Alone Drive Device ' \
+            drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Individual Director Storage Drive Device ' \
                         + str(dev) + ' - ' + created_by_str + '"')
             drv_res_txt = drv_res_txt.replace('Address =', 'Address = "' + sd_addr + '"')
             drv_res_txt = drv_res_txt.replace('Password =', 'Password = "' + sd_pass + '"')
@@ -784,25 +811,31 @@ for lib in lib_dict:
             drv_res_txt = drv_res_txt.replace('Device =', 'Device = "' + autochanger_name + '_Dev' + str(dev) + '"')
             drv_res_txt = drv_res_txt.replace('MaximumConcurrentJobs =', 'MaximumConcurrentJobs = "' + str(drive_mcj) + '"')
             drv_res_txt = drv_res_txt.replace('MediaType =', 'MediaType = "' + lib.replace('scsi-', '') + '"')
-            write_res_file(dir_st_dir + '/' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
+            if one_file:
+                dir_drv_res_txt += '\n' + drv_res_txt + ('\n' if dev == len(lib_dict[lib]) - 1 else '')
+            else:
+                write_res_file(dir_st_dir + '/' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
             dev += 1
+    if one_file:
+        one_dir_txt += dir_res_txt + dir_drv_res_txt
 
-    # Storage Autochanger
-    # -------------------
-    res_txt = storage_autochanger_tpl
+    # Storage Autochanger and Drive device resource(s)
+    # ------------------------------------------------
     log('- Generating Storage Autochanger and Device Resources:')
-    res_txt = res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
-    res_txt = res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
-    res_txt = res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
-    res_txt = res_txt.replace('autochanger_name', autochanger_name)
     log(' - ' + autochanger_name + ' with (' + str(len(lib_dict[lib])) + ') drives')
+    sd_res_txt = storage_autochanger_tpl
+    sd_res_txt = sd_res_txt.replace('Name =', 'Name = "' + autochanger_name + '"')
+    sd_res_txt = sd_res_txt.replace('Description =', 'Description = "' + created_by_str + '"')
+    sd_res_txt = sd_res_txt.replace('ChangerDevice =', 'ChangerDevice = "' + byid_node_dir_str + '/' + lib + '"')
+    sd_res_txt = sd_res_txt.replace('autochanger_name', autochanger_name)
     dev = 0
+    sd_drv_res_txt = ''
     autochanger_dev_str = ''
     while dev < len(lib_dict[lib]):
         # Storage Device resource config file for each drive device in the Autochanger
         # ----------------------------------------------------------------------------
-        drv_res_txt = storage_device_tpl
         log('  - ' + autochanger_name + '_Dev' + str(dev))
+        drv_res_txt = storage_device_tpl
         autochanger_dev_str += '"' + autochanger_name + '_Dev' + str(dev) + '"' + (', ' if dev <= (len(lib_dict[lib]) - 2) else '')
         drv_res_txt = drv_res_txt.replace('Name =', 'Name = "' + autochanger_name + '_Dev' + str(dev) + '"')
         drv_res_txt = drv_res_txt.replace('Description =', 'Description = "Drive ' + str(dev) \
@@ -818,11 +851,20 @@ for lib in lib_dict:
         drv_res_txt = drv_res_txt.replace('ArchiveDevice =', 'ArchiveDevice = "' + byid_node_dir_str + '/' + archive_device + '"')
         drv_res_txt = drv_res_txt.replace('ControlDevice =', 'ControlDevice = "/dev/' + control_device + '"')
         drv_res_txt = drv_res_txt.replace('storage_device_nst_node', autochanger_name + '_Dev' + str(dev) + '.log')
-        write_res_file(sd_device_dir + '/' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
+        if one_file:
+            sd_drv_res_txt += '\n' + drv_res_txt + ('\n' if dev == len(lib_dict[lib]) - 1 else '')
+        else:
+            write_res_file(sd_device_dir + '/' + autochanger_name + '_Dev' + str(dev) + '.cfg', drv_res_txt)
         dev += 1
-    res_txt = res_txt.replace(' Device =', ' Device = ' + autochanger_dev_str)
-    write_res_file(sd_auto_dir + '/' + autochanger_name + '.cfg', res_txt)
-    log('- Storage Autochanger and Device Resources Done\n')
+    sd_res_txt = sd_res_txt.replace(' Device =', ' Device = ' + autochanger_dev_str)
+    if one_file:
+       one_sd_txt += sd_res_txt + sd_drv_res_txt
+    else:
+        write_res_file(sd_auto_dir + '/' + autochanger_name + '.cfg', sd_res_txt)
+if one_file:
+    write_res_file(dir_st_dir + '/' + dir_file_name, one_dir_txt)
+    write_res_file(sd_auto_dir + '/' + sd_file_name + '.cfg', one_sd_txt)
+log('- Storage Autochanger and Device Resources Done\n')
 
 # Print location of log file and resource config files
 # ----------------------------------------------------
